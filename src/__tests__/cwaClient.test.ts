@@ -43,6 +43,39 @@ describe("loadRiskDashboardData", () => {
     expect(result?.snapshot?.national.activeWarningCountyCount).toBe(1);
   });
 
+  it("uses a relative static cache URL by default for project Pages deployments", async () => {
+    const requestedUrls: string[] = [];
+
+    const result = await loadRiskDashboardData({
+      fetcher: async (url) => {
+        requestedUrls.push(url);
+
+        if (url !== "data/latest.json") {
+          throw new Error("live source unavailable");
+        }
+
+        return new Response(
+          JSON.stringify({
+            payloads: {
+              generatedAt: "2026-05-30T00:10:00+08:00",
+              warningPayload: null,
+              rainfallPayload: { cwaopendata: { dataset: { Station: [] } } },
+              weatherPayload: { cwaopendata: { dataset: { Station: [] } } },
+              earthquakePayload: null,
+              typhoonPayload: null,
+            },
+          }),
+        );
+      },
+      now: () => new Date("2026-05-30T00:30:00+08:00"),
+    });
+
+    expect(requestedUrls).toContain("data/latest.json");
+    expect(requestedUrls).not.toContain("/data/latest.json");
+    expect(result.cacheUsed).toBe(true);
+    expect(result.fatal).toBe(false);
+  });
+
   it("returns a degraded snapshot when one official source fails but warning data succeeds", async () => {
     const fetcher = async (url: string) => {
       if (url.includes("O-A0002-001")) {

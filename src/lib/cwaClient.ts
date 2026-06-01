@@ -176,7 +176,7 @@ async function loadCacheFallback(
   if (cacheUrl === null) return null;
 
   try {
-    const cache = (await fetchJson(cacheUrl ?? "/data/latest.json", fetcher, timeoutMs)) as {
+    const cache = (await fetchJson(cacheUrl ?? "data/latest.json", fetcher, timeoutMs)) as {
       sources?: Array<Partial<SourceStatus> & { key?: CwaSourceKey }>;
       payloads?: Partial<CwaPayloads>;
     };
