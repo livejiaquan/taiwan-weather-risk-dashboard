@@ -50,6 +50,11 @@ interface SourceLoadFailure {
 
 type SourceLoadResult = SourceLoadSuccess | SourceLoadFailure;
 
+interface CachedDashboardData {
+  sources?: Array<Partial<SourceStatus> & { key?: CwaSourceKey }>;
+  payloads: Partial<CwaPayloads>;
+}
+
 const SOURCE_STALE_HOURS: Record<CwaSourceKey, number> = {
   warnings: 24,
   rainfall: 2,
@@ -86,7 +91,20 @@ export async function loadRiskDashboardData(
     };
   }
 
-  const payloads = resultsToPayloads(now, sourceResults);
+  let payloads = resultsToPayloads(now, sourceResults);
+  let cacheUsed = false;
+
+  if (options.cacheUrl !== null && sourceResults.some((result) => result.status.status === "error")) {
+    const cached = await fetchCacheData(options.cacheUrl, fetcher, timeoutMs);
+    if (cached) {
+      const merged = mergeFailedSourcesFromCache(payloads, cached.payloads, sourceResults);
+      if (merged) {
+        payloads = merged;
+        cacheUsed = true;
+      }
+    }
+  }
+
   const riskInput = createRiskInputFromCwaPayloads(payloads);
   const snapshot = buildRiskSnapshot(riskInput);
   const sources = sourceResults.map((result) => result.status);
@@ -96,7 +114,7 @@ export async function loadRiskDashboardData(
     sources,
     degraded: sources.some((source) => source.status === "error" || source.stale),
     fatal: false,
-    cacheUsed: false,
+    cacheUsed,
   };
 }
 
@@ -173,16 +191,10 @@ async function loadCacheFallback(
   timeoutMs: number,
   failedSources: SourceLoadResult[],
 ): Promise<RiskDashboardLoadResult | null> {
-  if (cacheUrl === null) return null;
+  const cache = await fetchCacheData(cacheUrl, fetcher, timeoutMs);
+  if (!cache) return null;
 
   try {
-    const cache = (await fetchJson(cacheUrl ?? "data/latest.json", fetcher, timeoutMs)) as {
-      sources?: Array<Partial<SourceStatus> & { key?: CwaSourceKey }>;
-      payloads?: Partial<CwaPayloads>;
-    };
-
-    if (!cache.payloads) return null;
-
     const payloads: CwaPayloads = {
       generatedAt: cache.payloads.generatedAt ?? now.toISOString(),
       warningPayload: cache.payloads.warningPayload ?? null,
@@ -204,6 +216,53 @@ async function loadCacheFallback(
   } catch {
     return null;
   }
+}
+
+async function fetchCacheData(
+  cacheUrl: string | null | undefined,
+  fetcher: Fetcher,
+  timeoutMs: number,
+): Promise<CachedDashboardData | null> {
+  if (cacheUrl === null) return null;
+
+  try {
+    const cache = (await fetchJson(cacheUrl ?? "data/latest.json", fetcher, timeoutMs)) as Partial<CachedDashboardData>;
+    return cache.payloads ? { sources: cache.sources, payloads: cache.payloads } : null;
+  } catch {
+    return null;
+  }
+}
+
+function mergeFailedSourcesFromCache(
+  livePayloads: CwaPayloads,
+  cachedPayloads: Partial<CwaPayloads>,
+  results: SourceLoadResult[],
+): CwaPayloads | null {
+  const merged = { ...livePayloads };
+  let filledSourceCount = 0;
+
+  for (const result of results) {
+    if (result.status.status !== "error") continue;
+
+    if (result.key === "warnings" && cachedPayloads.warningPayload != null) {
+      merged.warningPayload = cachedPayloads.warningPayload;
+      filledSourceCount += 1;
+    } else if (result.key === "rainfall" && cachedPayloads.rainfallPayload != null) {
+      merged.rainfallPayload = cachedPayloads.rainfallPayload;
+      filledSourceCount += 1;
+    } else if (result.key === "weather" && cachedPayloads.weatherPayload != null) {
+      merged.weatherPayload = cachedPayloads.weatherPayload;
+      filledSourceCount += 1;
+    } else if (result.key === "earthquake" && cachedPayloads.earthquakePayload != null) {
+      merged.earthquakePayload = cachedPayloads.earthquakePayload;
+      filledSourceCount += 1;
+    } else if (result.key === "typhoon" && cachedPayloads.typhoonPayload != null) {
+      merged.typhoonPayload = cachedPayloads.typhoonPayload;
+      filledSourceCount += 1;
+    }
+  }
+
+  return filledSourceCount > 0 ? merged : null;
 }
 
 function cacheSourcesToStatuses(

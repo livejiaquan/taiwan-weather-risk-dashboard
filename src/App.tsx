@@ -117,7 +117,7 @@ export function App() {
         }
       }
 
-      const data = await loadRiskDashboardData({ cacheUrl: preferCache ? null : undefined });
+      const data = await loadRiskDashboardData();
       if (data.fatal) {
         setState({ status: "error", data, error: "無法取得 CWA 即時資料，也沒有可用快取。" });
       } else {

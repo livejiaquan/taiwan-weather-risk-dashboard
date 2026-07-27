@@ -125,6 +125,60 @@ describe("loadRiskDashboardData", () => {
     expect(result.sources.find((source) => source.key === "rainfall")?.status).toBe("error");
   });
 
+  it("fills failed live sources from the static cache without hiding the source error", async () => {
+    const requestedUrls: string[] = [];
+    const warningPayload = {
+      cwaopendata: {
+        sent: "2026-05-30T00:00:00+08:00",
+        dataset: {
+          location: [
+            {
+              locationName: "花蓮縣",
+              geocode: "10015",
+              hazardConditions: {
+                hazards: {
+                  info: { phenomena: "豪雨", significance: "特報" },
+                  validTime: { startTime: "2026-05-29T22:41:00+08:00" },
+                },
+              },
+            },
+          ],
+        },
+      },
+    };
+
+    const result = await loadRiskDashboardData({
+      fetcher: async (url) => {
+        requestedUrls.push(url);
+        if (url === "data/latest.json") {
+          return new Response(
+            JSON.stringify({
+              payloads: {
+                generatedAt: "2026-05-30T00:10:00+08:00",
+                warningPayload,
+                rainfallPayload: null,
+                weatherPayload: null,
+                earthquakePayload: null,
+                typhoonPayload: null,
+              },
+            }),
+          );
+        }
+        if (url.includes("W-C0033-001")) {
+          throw new Error("warning source unavailable");
+        }
+        return new Response(JSON.stringify({ cwaopendata: { dataset: { Station: [] } } }));
+      },
+      now: () => new Date("2026-05-30T00:30:00+08:00"),
+    });
+
+    expect(requestedUrls).toContain("data/latest.json");
+    expect(result.cacheUsed).toBe(true);
+    expect(result.degraded).toBe(true);
+    expect(result.snapshot?.national.activeWarningCountyCount).toBe(1);
+    expect(result.sources.find((source) => source.key === "warnings")?.status).toBe("error");
+  });
+
   it("marks the load as fatal when every official source fails and no cache is available", async () => {
     const result = await loadRiskDashboardData({
       fetcher: async () => {
