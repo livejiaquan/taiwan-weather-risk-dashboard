@@ -76,6 +76,72 @@ describe("loadRiskDashboardData", () => {
     expect(result.fatal).toBe(false);
   });
 
+  it("retries a transient live-source failure before falling back to cache", async () => {
+    const attempts = new Map<string, number>();
+
+    const result = await loadRiskDashboardData({
+      fetcher: async (url) => {
+        const attempt = (attempts.get(url) ?? 0) + 1;
+        attempts.set(url, attempt);
+
+        if (url.includes("O-A0002-001") && attempt === 1) {
+          throw new TypeError("temporary network failure");
+        }
+
+        return new Response(JSON.stringify({ cwaopendata: { dataset: { Station: [] } } }));
+      },
+      now: () => new Date("2026-05-30T00:30:00+08:00"),
+      retryDelayMs: 0,
+    });
+
+    expect([...attempts.entries()].find(([url]) => url.includes("O-A0002-001"))?.[1]).toBe(2);
+    expect(result.sources.find((source) => source.key === "rainfall")?.status).toBe("success");
+    expect(result.cacheUsed).toBe(false);
+  });
+
+  it("retries a transient HTTP server error", async () => {
+    let rainfallAttempts = 0;
+
+    const result = await loadRiskDashboardData({
+      fetcher: async (url) => {
+        if (url.includes("O-A0002-001")) {
+          rainfallAttempts += 1;
+          if (rainfallAttempts === 1) return new Response(null, { status: 503 });
+        }
+        return new Response(JSON.stringify({ cwaopendata: { dataset: { Station: [] } } }));
+      },
+      now: () => new Date("2026-05-30T00:30:00+08:00"),
+      retryDelayMs: 0,
+    });
+
+    expect(rainfallAttempts).toBe(2);
+    expect(result.sources.find((source) => source.key === "rainfall")?.status).toBe("success");
+  });
+
+  it("retries a timed-out live-source request", async () => {
+    let rainfallAttempts = 0;
+
+    const result = await loadRiskDashboardData({
+      fetcher: async (url, init) => {
+        if (url.includes("O-A0002-001")) {
+          rainfallAttempts += 1;
+          if (rainfallAttempts === 1) {
+            return new Promise<Response>((_, reject) => {
+              init?.signal?.addEventListener("abort", () => reject(new globalThis.DOMException("Timed out", "AbortError")));
+            });
+          }
+        }
+        return new Response(JSON.stringify({ cwaopendata: { dataset: { Station: [] } } }));
+      },
+      now: () => new Date("2026-05-30T00:30:00+08:00"),
+      timeoutMs: 1,
+      retryDelayMs: 0,
+    });
+
+    expect(rainfallAttempts).toBe(2);
+    expect(result.sources.find((source) => source.key === "rainfall")?.status).toBe("success");
+  });
+
   it("returns a degraded snapshot when one official source fails but warning data succeeds", async () => {
     const fetcher = async (url: string) => {
       if (url.includes("O-A0002-001")) {

@@ -33,6 +33,7 @@ export interface LoadRiskDashboardOptions {
   fetcher?: Fetcher;
   now?: () => Date;
   timeoutMs?: number;
+  retryDelayMs?: number;
   cacheUrl?: string | null;
 }
 
@@ -69,10 +70,11 @@ export async function loadRiskDashboardData(
   const fetcher = options.fetcher ?? fetch;
   const now = options.now?.() ?? new Date();
   const timeoutMs = options.timeoutMs ?? 8000;
+  const retryDelayMs = options.retryDelayMs ?? 250;
 
   const sourceResults = await Promise.all(
     (Object.keys(CWA_ENDPOINTS) as CwaSourceKey[]).map((key) =>
-      loadSource(key, fetcher, now, timeoutMs),
+      loadSource(key, fetcher, now, timeoutMs, retryDelayMs),
     ),
   );
 
@@ -132,11 +134,12 @@ async function loadSource(
   fetcher: Fetcher,
   now: Date,
   timeoutMs: number,
+  retryDelayMs: number,
 ): Promise<SourceLoadResult> {
   const endpoint = CWA_ENDPOINTS[key];
 
   try {
-    const payload = await fetchJson(endpoint.url, fetcher, timeoutMs);
+    const payload = await fetchJsonWithRetry(endpoint.url, fetcher, timeoutMs, retryDelayMs);
     const updatedAt = updatedAtForSource(key, payload);
 
     return {
@@ -167,6 +170,27 @@ async function loadSource(
       },
     };
   }
+}
+
+async function fetchJsonWithRetry(
+  url: string,
+  fetcher: Fetcher,
+  timeoutMs: number,
+  retryDelayMs: number,
+): Promise<unknown> {
+  try {
+    return await fetchJson(url, fetcher, timeoutMs);
+  } catch (error) {
+    if (!isTransientFetchError(error)) throw error;
+    if (retryDelayMs > 0) await new Promise((resolve) => globalThis.setTimeout(resolve, retryDelayMs));
+    return fetchJson(url, fetcher, timeoutMs);
+  }
+}
+
+function isTransientFetchError(error: unknown): boolean {
+  if (error instanceof TypeError) return true;
+  if (error instanceof globalThis.DOMException && error.name === "AbortError") return true;
+  return error instanceof Error && /^HTTP 5\d\d$/.test(error.message);
 }
 
 async function fetchJson(url: string, fetcher: Fetcher, timeoutMs: number): Promise<unknown> {
