@@ -1,6 +1,26 @@
 import { describe, expect, it } from "vitest";
 import { loadCachedRiskDashboardData, loadRiskDashboardData } from "../lib/cwaClient";
 
+function validPayloadFor(url: string) {
+  if (url.includes("O-A0002-001")) {
+    return {
+      cwaopendata: {
+        dataset: {
+          Station: [
+            {
+              StationName: "測試站",
+              GeoInfo: { CountyName: "臺北市" },
+              ObsTime: { DateTime: "2026-05-30T00:20:00+08:00" },
+              RainfallElement: { Past1hr: { Precipitation: 0 } },
+            },
+          ],
+        },
+      },
+    };
+  }
+  return { cwaopendata: { dataset: { Station: [] } } };
+}
+
 describe("loadRiskDashboardData", () => {
   it("can load the static cache directly for a fast first paint", async () => {
     const result = await loadCachedRiskDashboardData({
@@ -88,7 +108,7 @@ describe("loadRiskDashboardData", () => {
           throw new TypeError("temporary network failure");
         }
 
-        return new Response(JSON.stringify({ cwaopendata: { dataset: { Station: [] } } }));
+        return new Response(JSON.stringify(validPayloadFor(url)));
       },
       now: () => new Date("2026-05-30T00:30:00+08:00"),
       retryDelayMs: 0,
@@ -108,7 +128,7 @@ describe("loadRiskDashboardData", () => {
           rainfallAttempts += 1;
           if (rainfallAttempts === 1) return new Response(null, { status: 503 });
         }
-        return new Response(JSON.stringify({ cwaopendata: { dataset: { Station: [] } } }));
+        return new Response(JSON.stringify(validPayloadFor(url)));
       },
       now: () => new Date("2026-05-30T00:30:00+08:00"),
       retryDelayMs: 0,
@@ -131,7 +151,7 @@ describe("loadRiskDashboardData", () => {
             });
           }
         }
-        return new Response(JSON.stringify({ cwaopendata: { dataset: { Station: [] } } }));
+        return new Response(JSON.stringify(validPayloadFor(url)));
       },
       now: () => new Date("2026-05-30T00:30:00+08:00"),
       timeoutMs: 1,
@@ -140,6 +160,50 @@ describe("loadRiskDashboardData", () => {
 
     expect(rainfallAttempts).toBe(2);
     expect(result.sources.find((source) => source.key === "rainfall")?.status).toBe("success");
+  });
+
+  it("rejects rainfall payloads that contain stations but no risk-bearing measurements", async () => {
+    const result = await loadRiskDashboardData({
+      fetcher: async (url) => {
+        if (url.includes("W-C0033-001")) {
+          return new Response(
+            JSON.stringify({
+              cwaopendata: {
+                sent: "2026-05-30T00:00:00+08:00",
+                dataset: { location: [] },
+              },
+            }),
+          );
+        }
+        if (url.includes("O-A0002-001")) {
+          return new Response(
+            JSON.stringify({
+              cwaopendata: {
+                dataset: {
+                  Station: [
+                    {
+                      StationName: "測試站",
+                      GeoInfo: { CountyName: "臺北市" },
+                      ObsTime: { DateTime: "2026-05-30T00:20:00+08:00" },
+                      RainfallElement: {},
+                    },
+                  ],
+                },
+              },
+            }),
+          );
+        }
+        throw new Error("source unavailable");
+      },
+      now: () => new Date("2026-05-30T00:30:00+08:00"),
+      cacheUrl: null,
+    });
+
+    const rainfall = result.sources.find((source) => source.key === "rainfall");
+    expect(rainfall?.status).toBe("error");
+    expect(rainfall?.error).toBe("No usable rainfall observations");
+    expect(result.degraded).toBe(true);
+    expect(result.fatal).toBe(false);
   });
 
   it("returns a degraded snapshot when one official source fails but warning data succeeds", async () => {

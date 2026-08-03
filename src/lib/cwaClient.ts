@@ -2,6 +2,7 @@ import {
   CWA_ENDPOINTS,
   createRiskInputFromCwaPayloads,
   normalizeEarthquakeData,
+  normalizeRainfallData,
   normalizeTyphoonData,
   type CwaPayloads,
   type CwaSourceKey,
@@ -140,6 +141,9 @@ async function loadSource(
 
   try {
     const payload = await fetchJsonWithRetry(endpoint.url, fetcher, timeoutMs, retryDelayMs);
+    if (key === "rainfall" && !hasUsableRainfallObservation(payload)) {
+      throw new Error("No usable rainfall observations");
+    }
     const updatedAt = updatedAtForSource(key, payload);
 
     return {
@@ -170,6 +174,12 @@ async function loadSource(
       },
     };
   }
+}
+
+function hasUsableRainfallObservation(payload: unknown): boolean {
+  return normalizeRainfallData(payload).some(
+    (station) => station.past1h !== undefined || station.past3h !== undefined || station.past24h !== undefined,
+  );
 }
 
 async function fetchJsonWithRetry(
