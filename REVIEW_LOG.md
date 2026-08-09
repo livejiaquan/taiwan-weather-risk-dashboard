@@ -60,3 +60,46 @@ After Phase 2 and Phase 3 core data/risk implementation:
 - Browser console after final live reload: 0 errors, 0 warnings.
 - Failure state verified by forcing CWA and cache requests to fail; fatal error panel and per-source failures rendered.
 - Cache-first browser check: first viewport rendered the national risk answer in the initial Playwright open snapshot.
+
+## 2026-08-10 - Trust-First Product Revalidation
+
+### Mission and External Evidence
+
+- Rejected the nationwide “Is Taiwan safe?” framing and the uncalibrated cross-hazard score as the primary product.
+- Reframed the task around one selected county/city, currently effective CWA warnings, affected sub-areas, validity times, provenance, a concrete next step, and an official verification link.
+- Rechecked CWA warning, observation, earthquake, and tropical-cyclone semantics; NCDR alert products; CWA reuse rules; and GitHub scheduled-workflow limits.
+- Recorded the evidence, alternatives, guardrails, and unproven differentiation hypothesis in `PRODUCT_STRATEGY.md`.
+
+### Baseline Product Risks Reproduced
+
+- Expired warnings remained active because parsed validity times were not enforced.
+- A warning-source failure could merge an old cache with other live sources and still produce a complete-looking current snapshot.
+- Source fetch time, official update time, and cache generation time were not distinguishable in the primary answer.
+- The public first viewport foregrounded an unbounded score and nationwide conclusion; county selection was not shareable in the URL.
+- On a 390 × 844 viewport, the destination warning details and action were initially below the first viewport.
+
+### Corrections Reviewed
+
+- Added a 90-minute cache budget, live/cache/none provenance, per-source times, `no-store` fetches, and fail-closed partial-source behavior.
+- Required exact canonical 22-county coverage plus complete hazard, validity-window, and affected-area schema before accepting a warning feed.
+- Filtered expired and not-yet-effective warnings; removed earthquake reports and regional cyclone tracks from current weather scoring.
+- Replaced the first-screen score with destination selection, official warning semantics, source status, affected areas, action guidance, and direct official links.
+- Made the selected county shareable through `?county=` and restored it across reload, browser Back, and invalid URL input.
+- Made warnings the only critical static-cache source, while recording unavailable observation/context sources without replacing truth with mock data.
+
+### Verification Evidence
+
+- `npm run lint`: passed.
+- `npm run test`: 5 files, 70 tests passed.
+- `npm run build`: passed; final assets `index-DDxo0VKY.js` and `index-6niwb6db.css`.
+- Isolated live cache-contract smoke test: 5/5 CWA sources fetched; warning feed covered 22 counties and passed the strict schema gate; repository cache was not modified.
+- Fresh production-build browser matrix: 49/49 checks passed across 1440 × 900 and 390 × 844, including happy, current-warning, partial-warning, stale-cache, incomplete-cache, fatal, URL selection/Back, overflow, page errors, and console output.
+- Keyboard/focus follow-up: 13/13 checks passed.
+- Current-warning mobile first viewport contained warning title, full validity window, affected area, and site action; screenshot: `/tmp/twrd-final-browser-v2/current-warning-mobile-390.png`.
+- Fatal-state stable recapture confirmed complete 390 × 844 rendering with zero horizontal scroll or transforms; screenshot: `/tmp/twrd-final-browser-v2/fatal-stable-a-mobile-390.png`. An earlier clipped tool preview was an image-viewer decoding artifact, not a product defect.
+- Independent architecture and testing reviews found no P0/P1 correctness blocker. Remaining P2 work is tracked in `TASKS.md`.
+- Independent post-implementation Mission review passed Gates A–E for this truth/destination iteration only.
+
+### Outcome Boundary
+
+This iteration establishes the warning truth and destination-first foundation. It does not prove that unfamiliar users prefer this product to CWA/NCDR, that the 90-minute fallback budget is optimal, or that GitHub Pages/Actions meets a long-term public-service freshness target. Custom-domain launch and production readiness remain explicitly unclaimed.

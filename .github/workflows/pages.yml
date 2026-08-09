@@ -5,7 +5,8 @@ on:
     branches: [main]
   workflow_dispatch:
   schedule:
-    - cron: "*/30 * * * *"
+    # Best-effort refresh: GitHub may delay or skip scheduled workflow runs.
+    - cron: "17,47 * * * *"
 
 permissions:
   contents: read
@@ -31,6 +32,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Lint
+        run: npm run lint
 
       - name: Refresh CWA cache
         run: npm run fetch:data

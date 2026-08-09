@@ -153,4 +153,92 @@ describe("buildRiskSnapshot", () => {
     expect(snapshot.sections.earthquake.recent).toBe(true);
     expect(snapshot.sections.typhoon.active).toBe(true);
   });
+
+  it("uses only warnings that are effective at the snapshot reference time", () => {
+    const snapshot = buildRiskSnapshot({
+      generatedAt: "2026-05-30T00:30:00+08:00",
+      warnings: [
+        {
+          countyName: "花蓮縣",
+          geocode: "10015",
+          phenomena: "豪雨",
+          significance: "特報",
+          startTime: "2026-05-29T20:00:00+08:00",
+          endTime: "2026-05-30T00:29:59+08:00",
+          affectedAreas: ["已過期區域"],
+        },
+        {
+          countyName: "基隆市",
+          geocode: "10017",
+          phenomena: "陸上強風",
+          significance: "特報",
+          startTime: "2026-05-30T00:30:01+08:00",
+          endTime: "2026-05-30T05:00:00+08:00",
+          affectedAreas: ["尚未生效區域"],
+        },
+        {
+          countyName: "臺北市",
+          geocode: "63",
+          phenomena: "豪雨",
+          significance: "特報",
+          startTime: "2026-05-30T00:00:00+08:00",
+          endTime: "2026-05-30T02:00:00+08:00",
+          affectedAreas: ["有效區域"],
+        },
+      ],
+      rainfallStations: [],
+      weatherStations: [],
+      earthquake: null,
+      typhoon: null,
+    });
+
+    const taipei = snapshot.counties.find((county) => county.countyName === "臺北市");
+    const hualien = snapshot.counties.find((county) => county.countyName === "花蓮縣");
+    const keelung = snapshot.counties.find((county) => county.countyName === "基隆市");
+
+    expect(snapshot.national.activeWarningCountyCount).toBe(1);
+    expect(taipei?.warnings).toHaveLength(1);
+    expect(taipei?.score).toBeGreaterThan(0);
+    expect(hualien?.warnings).toEqual([]);
+    expect(hualien?.score).toBe(0);
+    expect(keelung?.warnings).toEqual([]);
+    expect(keelung?.score).toBe(0);
+    expect(snapshot.attentionToday.join(" ")).toContain("有效區域");
+    expect(snapshot.attentionToday.join(" ")).not.toContain("已過期區域");
+    expect(snapshot.attentionToday.join(" ")).not.toContain("尚未生效區域");
+  });
+
+  it("keeps recent earthquake and tropical-cyclone records out of risk scoring and attention", () => {
+    const snapshot = buildRiskSnapshot({
+      generatedAt: "2026-05-30T00:30:00+08:00",
+      warnings: [],
+      rainfallStations: [],
+      weatherStations: [],
+      earthquake: {
+        occurredAt: "2026-05-29T23:50:00+08:00",
+        magnitude: 6.1,
+        depthKm: 12,
+        description: "測試用顯著有感地震",
+        countyIntensities: [{ countyName: "花蓮縣", maxIntensity: 6 }],
+      },
+      typhoon: {
+        name: "TEST",
+        localName: "測試颱風",
+        latestAt: "2026-05-30T00:00:00+08:00",
+        distanceKmFromTaiwan: 50,
+        maxWindSpeed: 55,
+      },
+    });
+
+    expect(snapshot.national.level).toBe("safe");
+    expect(snapshot.national.score).toBe(0);
+    expect(snapshot.counties.every((county) => county.score === 0)).toBe(true);
+    expect(snapshot.counties.every((county) => county.reasons.length === 0)).toBe(true);
+    expect(snapshot.counties.every((county) => county.metrics.earthquakeIntensity === undefined)).toBe(true);
+    expect(snapshot.attentionToday.join(" ")).not.toMatch(/地震|熱帶氣旋|颱風/);
+    expect(snapshot.sections.earthquake.recent).toBe(true);
+    expect(snapshot.sections.earthquake.signal?.magnitude).toBe(6.1);
+    expect(snapshot.sections.typhoon.active).toBe(true);
+    expect(snapshot.sections.typhoon.signal?.localName).toBe("測試颱風");
+  });
 });
