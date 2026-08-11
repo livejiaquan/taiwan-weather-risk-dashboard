@@ -137,16 +137,47 @@ Tradeoff:
 - An upstream schema or county-list change will temporarily produce `unavailable` until the contract is reviewed and updated.
 - Browser and generator validators remain duplicated for this iteration and must be consolidated to prevent future drift.
 
-### Publish Warning Cache When Context Sources Degrade
+### Keep the Static Fallback Warning-Only
 
-Decision: A complete, validated warning feed is the only critical requirement for publishing a new static cache. Rain, weather-station, earthquake, or regional cyclone failures are recorded as unavailable context and do not block an otherwise valid warning artifact.
+Decision: A complete, validated warning feed is the only payload persisted in the static fallback. Rain, weather-station, earthquake, and regional-cyclone raw feeds are fetched only by the browser live path and remain unavailable when that path fails.
 
 Rationale:
 
 - The primary user outcome is the destination warning answer; observations and recent records are explicitly secondary context.
-- Blocking a current warning refresh because a non-warning source failed could leave the deployed warning cache older than necessary.
+- The previous 2.0 MB raw artifact was 96.8% observation data while the warning feed itself was about 6 KB.
+- Removing optional feeds from cache reduces cold-load transfer and JSON parsing, avoids blocking warning publication on unrelated sources, and makes a strict artifact-size budget practical.
 
 Tradeoff:
 
-- Some deployments contain a complete warning view with unavailable observation cards.
-- The UI and provenance contract must keep those degraded sources visible and must not infer missing observations.
+- During a live-source outage, the product can retain recent warning truth but observation cards show unavailable rather than historical values.
+- Cache remains an availability fallback, not current confirmation; an empty cache still cannot prove that no warning exists.
+
+### Bound Warning Cache Generation
+
+Decision: Each generator request has an eight-second timeout and one retry only for network failure, timeout, or HTTP 5xx. HTTP 4xx and schema failures are not retried. The Pages build and deploy jobs have 15- and 10-minute timeouts.
+
+Rationale:
+
+- An unbounded upstream request could prevent the last-known-good warning artifact from being refreshed or leave an Actions job running for the platform default of six hours.
+- Retrying only transient classes improves recovery without repeatedly accepting or requesting structurally invalid data.
+
+Tradeoff:
+
+- A valid but unusually slow upstream response can miss one refresh cycle.
+- GitHub scheduling is still best effort; these bounds do not replace independent freshness monitoring.
+
+Warning `sent` is retained as CWA issuance metadata, not treated as a fixed-interval heartbeat. A successful direct fetch of the canonical 22-county feed is marked direct at the site's fetch time; cache fallback is bounded by its generation time; individual warnings are shown only within their official validity windows. This avoids inventing an arbitrary `sent` age limit that could hide an unchanged but still-valid warning.
+
+### Remove the Dormant Composite Risk Model
+
+Decision: Remove county `safe`/level/score/reasons, national score/answer, and generated attention copy from the runtime snapshot. Keep effective official warnings, warning county count, observation metrics/rankings, and explicitly separated recent context.
+
+Rationale:
+
+- The UI no longer used these fields, but retaining them made it easy for a future change to reintroduce an uncalibrated safety claim.
+- Deleting the model aligns the executable contract—not only the visible copy—with the destination-first mission.
+
+Tradeoff:
+
+- Historical score consumers would break, but no current runtime, persistence, or public API consumer exists.
+- The repository name and some internal type names remain historical; renaming them is not required for semantic safety.

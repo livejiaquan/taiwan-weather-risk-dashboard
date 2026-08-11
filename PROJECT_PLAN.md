@@ -45,12 +45,14 @@ The product never declares a place safe. Official warnings, observations, and si
 
 ## Next Iteration — Reliable Data Delivery
 
-- Define runtime schemas for every required payload.
-- Reject partial required-source cache generation and retain last known good deployment.
-- Normalize and compact raw feeds into a small provenance-rich artifact.
-- Add CI lint and explicit artifact validation.
-- Move the cron off minute `0` and document that GitHub schedule is best effort.
-- Add an external freshness check and named recovery procedure.
+- [x] Define a strict runtime schema for the mission-critical warning payload.
+- [x] Reject incomplete warning cache generation and retain the last known good deployment.
+- [x] Reduce the fallback from full multi-source raw feeds to a warning-only artifact with a 64 KiB budget.
+- [x] Add bounded generator retry/timeout, CI lint, artifact validation, and a workflow timeout.
+- [x] Move the cron off minute `0` and document that GitHub schedule is best effort.
+- [ ] Consolidate the duplicated browser/generator warning validator.
+- [ ] Start cache and live requests concurrently with deterministic live-result precedence.
+- [ ] Add an external freshness check and named recovery procedure.
 
 ## Validation Iteration — Prove Differentiation
 

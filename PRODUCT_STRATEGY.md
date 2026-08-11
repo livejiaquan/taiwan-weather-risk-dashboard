@@ -91,7 +91,8 @@ Observations may add context. They must be labelled as observations or site inte
 
 - Validate required schemas and freshness before creating a cache or deploying.
 - Keep the last known good artifact instead of replacing it with a partial cache.
-- Produce a compact normalized payload with provenance rather than shipping full raw feeds.
+- Keep the static fallback warning-only and size-bounded rather than shipping full observation feeds.
+- Bound generator requests, retries, and workflow execution time.
 - Add independent freshness monitoring; treat GitHub cron only as a fallback mechanism.
 - Add CI lint, dependency/security maintenance, and documented recovery ownership.
 

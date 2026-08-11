@@ -73,11 +73,13 @@ npm run build
 npm run fetch:data
 ```
 
-腳本會產生 `public/data/latest.json`。應用程式會先用 90 分鐘內的 cache 快速首繪，隨即要求 CWA live sources 並在成功後取代畫面；live 失敗時才保留時效內 cache。Cache 中有警報時仍明示為快取；cache 沒有警報時不得推論現況沒有警報。
+腳本會產生 `public/data/latest.json`。這份 fallback **只保存完整的縣市警特報**，不再打包數千筆雨量站、氣象站、地震或熱帶氣旋 raw records；觀測脈絡只由瀏覽器的 live path 取得。Artifact 有 64 KiB raw 上限測試，目前真實產物約 6 KiB。
 
-Warning cache 只有在完整覆蓋 22 縣市、縣市名稱與代碼一致，且 hazard／有效時間／影響區域 schema 可解析時才會被採用或覆蓋部署產物。雨量、氣象站、地震與熱帶氣旋是可降級的背景來源，不會阻止保存一份完整的新警報 cache。
+應用程式會先用 90 分鐘內的 cache 快速首繪，隨即要求 CWA live sources 並在成功後取代畫面；live 失敗時才保留時效內 cache。Cache 中有警報時仍明示為快取；cache 沒有警報時不得推論現況沒有警報。
 
-GitHub Actions 排程只作 best-effort fallback：排程可能延遲或漏跑，因此不是警示更新 SLA，也不應是長期正式部署的唯一 ingestion path。
+Warning cache 只有在完整覆蓋 22 縣市、縣市名稱與代碼一致，且 hazard／有效時間／影響區域 schema 可解析時才會被採用或覆蓋部署產物。Generator 每次 request 有 8 秒 timeout，只對 network、timeout 或 HTTP 5xx 重試一次；warning 仍失敗時不寫入、不 rename，保留 last-known-good artifact。
+
+GitHub Actions 排程只作 best-effort fallback：排程可能延遲或漏跑，因此不是警示更新 SLA，也不應是長期正式部署的唯一 ingestion path。Build／deploy job 分別設 15／10 分鐘上限，避免上游或 runner 無界等待。
 
 ## 部署
 

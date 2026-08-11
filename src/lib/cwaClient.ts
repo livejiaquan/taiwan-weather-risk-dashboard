@@ -327,7 +327,10 @@ async function fetchJson(url: string, fetcher: Fetcher, timeoutMs: number): Prom
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
     }
-    return response.json();
+    // Keep the abort timer active while the body is read as well as while
+    // response headers are pending. A stalled JSON body must fail closed and
+    // allow the bounded retry path to run.
+    return await response.json();
   } finally {
     globalThis.clearTimeout(timeout);
   }

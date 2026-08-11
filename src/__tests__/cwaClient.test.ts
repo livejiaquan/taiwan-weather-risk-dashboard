@@ -556,6 +556,37 @@ describe("loadRiskDashboardData", () => {
     expect(result.sources.find((source) => source.key === "rainfall")?.status).toBe("success");
   });
 
+  it("keeps the live-source timeout active while a response body is being read", async () => {
+    let rainfallAttempts = 0;
+
+    const result = await loadRiskDashboardData({
+      fetcher: async (url, init) => {
+        if (url.includes("O-A0002-001")) {
+          rainfallAttempts += 1;
+          if (rainfallAttempts === 1) {
+            return {
+              ok: true,
+              status: 200,
+              json: () =>
+                new Promise<unknown>((_resolve, reject) => {
+                  init?.signal?.addEventListener("abort", () =>
+                    reject(new globalThis.DOMException("Timed out reading body", "AbortError")),
+                  );
+                }),
+            } as Response;
+          }
+        }
+        return new Response(JSON.stringify(validPayloadFor(url)));
+      },
+      now: () => new Date("2026-05-30T00:30:00+08:00"),
+      timeoutMs: 1,
+      retryDelayMs: 0,
+    });
+
+    expect(rainfallAttempts).toBe(2);
+    expect(result.sources.find((source) => source.key === "rainfall")?.status).toBe("success");
+  });
+
   it("rejects rainfall payloads that contain stations but no risk-bearing measurements", async () => {
     const result = await loadRiskDashboardData({
       fetcher: async (url) => {
@@ -620,8 +651,10 @@ describe("loadRiskDashboardData", () => {
     expect(result.fatal).toBe(false);
     expect(result.snapshot).not.toBeNull();
     const snapshot = result.snapshot!;
-    expect(snapshot.national.level).toBe("elevated");
     expect(snapshot.national.activeWarningCountyCount).toBe(1);
+    expect(snapshot.counties.find((county) => county.countyName === "花蓮縣")?.warnings).toEqual([
+      expect.objectContaining({ phenomena: "豪雨" }),
+    ]);
     expect(result.sources.find((source) => source.key === "warnings")?.status).toBe("success");
     expect(result.sources.find((source) => source.key === "warnings")?.provenance).toBe("live");
     expect(result.sources.find((source) => source.key === "rainfall")?.status).toBe("error");

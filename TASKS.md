@@ -24,13 +24,14 @@ The original portfolio-first build is superseded by the public-product mission i
 
 - [x] Require a complete 22-county warning schema before replacing the deployed cache.
 - [x] Preserve the last known good artifact when warning refresh is incomplete or invalid.
-- [ ] Normalize and compact the cache instead of shipping full raw feeds.
+- [x] Compact the fallback to the complete warning feed only, enforce a 64 KiB raw budget, and stop shipping full observation feeds.
 - [x] Add lint and artifact validation to CI.
 - [x] Move the scheduled job away from minute `0`; document that scheduling remains best effort.
 - [ ] Add an external freshness probe and a named recovery/rollback runbook.
 - [ ] Consolidate duplicated browser/generator warning validators into one shared contract.
-- [ ] Add timeout/retry bounds to cache generation and a workflow job timeout.
-- [ ] Remove the unused legacy score/`safe`/national-answer model so it cannot regress into the UI.
+- [x] Add per-request timeout/one retry to cache generation and a 15-minute workflow job timeout.
+- [x] Remove the unused legacy score/`safe`/national-answer model so it cannot regress into the UI.
+- [ ] Start cache and live requests concurrently without allowing a late cache result to replace live truth.
 
 ## Iteration 3 — Validate Real User Value
 

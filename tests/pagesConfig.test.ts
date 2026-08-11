@@ -1,6 +1,7 @@
 // @vitest-environment node
 
 import { readFileSync } from "node:fs";
+import { Buffer } from "node:buffer";
 import { describe, expect, it, vi } from "vitest";
 import {
   main as fetchCwaData,
@@ -40,6 +41,11 @@ describe("GitHub Pages workflow", () => {
     expect(lintIndex).toBeGreaterThan(-1);
     expect(lintIndex).toBeLessThan(testIndex);
     expect(lintIndex).toBeLessThan(buildIndex);
+  });
+
+  it("bounds the build job instead of relying on the six-hour Actions default", () => {
+    expect(workflow).toMatch(/jobs:\s*[\s\S]*?build:\s*[\s\S]*?timeout-minutes:\s*15/);
+    expect(workflow).toMatch(/deploy:\s*[\s\S]*?timeout-minutes:\s*10/);
   });
 });
 
@@ -110,14 +116,24 @@ const weatherPayload = {
 };
 
 describe("CWA cache payload validation", () => {
-  it("accepts the tracked cache's critical source schemas", () => {
-    const cache = JSON.parse(readFileSync("public/data/latest.json", "utf8")) as {
-      payloads: Record<"warningPayload" | "rainfallPayload" | "weatherPayload", unknown>;
+  it("keeps the tracked fallback warning-only and within its transfer budget", () => {
+    const contents = readFileSync("public/data/latest.json", "utf8");
+    const cache = JSON.parse(contents) as {
+      sources: Array<{ key: string }>;
+      payloads: Record<
+        "warningPayload" | "rainfallPayload" | "weatherPayload" | "earthquakePayload" | "typhoonPayload",
+        unknown
+      >;
     };
 
     expect(() => validateWarningPayload(cache.payloads.warningPayload)).not.toThrow();
-    expect(() => validateRainfallPayload(cache.payloads.rainfallPayload)).not.toThrow();
-    expect(() => validateWeatherPayload(cache.payloads.weatherPayload)).not.toThrow();
+    expect(cache.sources.map((source) => source.key)).toEqual(["warnings"]);
+    expect(cache.payloads.rainfallPayload).toBeNull();
+    expect(cache.payloads.weatherPayload).toBeNull();
+    expect(cache.payloads.earthquakePayload).toBeNull();
+    expect(cache.payloads.typhoonPayload).toBeNull();
+    expect(contents).not.toContain('"Station"');
+    expect(Buffer.byteLength(contents)).toBeLessThanOrEqual(64 * 1024);
   });
 
   it("accepts a complete 22-county warning mirror", () => {
@@ -373,16 +389,121 @@ describe("CWA cache replacement", () => {
     };
   }
 
-  it("refuses to write when the warning source HTTP request fails", async () => {
+  it("retries a transient warning HTTP failure once before atomically publishing", async () => {
     const files = mockFileSystem();
+    let warningAttempts = 0;
+    const fetchImpl = vi.fn(async (input: Parameters<typeof fetch>[0]) => {
+      const url = String(input);
+      if (url !== CWA_ENDPOINTS.warnings.url) throw new Error(`Unexpected source: ${url}`);
+      warningAttempts += 1;
+      if (warningAttempts === 1) return new Response(null, { status: 503 });
+      return new Response(JSON.stringify(warningPayload()));
+    }) as typeof fetch;
+
+    await fetchCwaData({
+      fetchImpl,
+      outputPath: "/virtual/latest.json",
+      retryDelayMs: 0,
+      fileSystem: files.implementation,
+      logger: { log: vi.fn(), warn: vi.fn() },
+    });
+
+    expect(warningAttempts).toBe(2);
+    expect(files.implementation.writeFile).toHaveBeenCalledOnce();
+    expect(files.implementation.rename).toHaveBeenCalledOnce();
+  });
+
+  it("bounds and retries a timed-out warning request", async () => {
+    const files = mockFileSystem();
+    let warningAttempts = 0;
+    const fetchImpl = vi.fn(async (_input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+      warningAttempts += 1;
+      if (warningAttempts === 1) {
+        return new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () => reject(new globalThis.DOMException("Timed out", "AbortError")));
+        });
+      }
+      return new Response(JSON.stringify(warningPayload()));
+    }) as typeof fetch;
+
+    await fetchCwaData({
+      fetchImpl,
+      outputPath: "/virtual/latest.json",
+      timeoutMs: 1,
+      retryDelayMs: 0,
+      fileSystem: files.implementation,
+      logger: { log: vi.fn(), warn: vi.fn() },
+    });
+
+    expect(warningAttempts).toBe(2);
+    expect(files.implementation.rename).toHaveBeenCalledOnce();
+  });
+
+  it("keeps the timeout active while the response body is being read", async () => {
+    const files = mockFileSystem();
+    let warningAttempts = 0;
+    const fetchImpl = vi.fn(async (_input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+      warningAttempts += 1;
+      if (warningAttempts === 1) {
+        return {
+          ok: true,
+          status: 200,
+          json: () =>
+            new Promise<unknown>((_resolve, reject) => {
+              init?.signal?.addEventListener("abort", () =>
+                reject(new globalThis.DOMException("Timed out reading body", "AbortError")),
+              );
+            }),
+        } as Response;
+      }
+      return new Response(JSON.stringify(warningPayload()));
+    }) as typeof fetch;
+
+    await fetchCwaData({
+      fetchImpl,
+      outputPath: "/virtual/latest.json",
+      timeoutMs: 1,
+      retryDelayMs: 0,
+      fileSystem: files.implementation,
+      logger: { log: vi.fn(), warn: vi.fn() },
+    });
+
+    expect(warningAttempts).toBe(2);
+    expect(files.implementation.rename).toHaveBeenCalledOnce();
+  });
+
+  it("refuses to write after a persistent warning source failure", async () => {
+    const files = mockFileSystem();
+    const fetchImpl = mockFetch({ [CWA_ENDPOINTS.warnings.url]: { status: 503 } });
     await expect(
       fetchCwaData({
-        fetchImpl: mockFetch({ [CWA_ENDPOINTS.warnings.url]: { status: 503 } }),
+        fetchImpl,
         outputPath: "/virtual/latest.json",
+        retryDelayMs: 0,
         fileSystem: files.implementation,
         logger: { log: vi.fn(), warn: vi.fn() },
       }),
     ).rejects.toThrow(/Critical CWA validation failed/);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(files.implementation.writeFile).not.toHaveBeenCalled();
+    expect(files.implementation.rename).not.toHaveBeenCalled();
+  });
+
+  it("does not retry a non-transient warning 4xx response", async () => {
+    const files = mockFileSystem();
+    const fetchImpl = mockFetch({ [CWA_ENDPOINTS.warnings.url]: { status: 404 } });
+
+    await expect(
+      fetchCwaData({
+        fetchImpl,
+        outputPath: "/virtual/latest.json",
+        retryDelayMs: 0,
+        fileSystem: files.implementation,
+        logger: { log: vi.fn(), warn: vi.fn() },
+      }),
+    ).rejects.toThrow(/Critical CWA validation failed/);
+
+    expect(fetchImpl).toHaveBeenCalledOnce();
     expect(files.implementation.writeFile).not.toHaveBeenCalled();
     expect(files.implementation.rename).not.toHaveBeenCalled();
   });
@@ -425,49 +546,68 @@ describe("CWA cache replacement", () => {
     expect(files.implementation.rename).not.toHaveBeenCalled();
   });
 
-  it("publishes a complete warning cache when rainfall and weather context fail", async () => {
+  it("does not fetch or persist optional context in the mission-critical fallback", async () => {
     const files = mockFileSystem();
-    const warn = vi.fn();
+    const fetchImpl = mockFetch();
     const cache = await fetchCwaData({
-      fetchImpl: mockFetch({
-        [CWA_ENDPOINTS.rainfall.url]: { status: 503 },
-        [CWA_ENDPOINTS.weather.url]: { status: 200, payload: {} },
-      }),
+      fetchImpl,
       outputPath: "/virtual/latest.json",
       fileSystem: files.implementation,
-      logger: { log: vi.fn(), warn },
+      logger: { log: vi.fn(), warn: vi.fn() },
     });
 
-    expect(cache.sources.find((source) => source.key === "warnings")?.status).toBe("success");
-    expect(cache.sources.find((source) => source.key === "rainfall")?.status).toBe("error");
-    expect(cache.sources.find((source) => source.key === "weather")?.status).toBe("error");
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(fetchImpl).toHaveBeenCalledWith(
+      CWA_ENDPOINTS.warnings.url,
+      expect.objectContaining({ signal: expect.any(globalThis.AbortSignal) }),
+    );
+    expect(cache.sources.map((source) => source.key)).toEqual(["warnings"]);
     expect(cache.payloads.rainfallPayload).toBeNull();
     expect(cache.payloads.weatherPayload).toBeNull();
-    expect(warn).toHaveBeenCalledTimes(2);
+    expect(cache.payloads.earthquakePayload).toBeNull();
+    expect(cache.payloads.typhoonPayload).toBeNull();
+    expect(files.written).not.toContain('"Station"');
+    expect(Buffer.byteLength(files.written)).toBeLessThanOrEqual(64 * 1024);
     expect(files.implementation.writeFile).toHaveBeenCalledOnce();
     expect(files.implementation.rename).toHaveBeenCalledOnce();
   });
 
-  it("records optional failures and atomically replaces one consistent cache", async () => {
+  it("refuses to write a schema-valid warning artifact above the 64 KiB budget", async () => {
+    const files = mockFileSystem();
+    const oversizedWarningPayload = {
+      ...warningPayload(),
+      unexpectedPadding: "x".repeat(70 * 1024),
+    };
+
+    await expect(
+      fetchCwaData({
+        fetchImpl: mockFetch({
+          [CWA_ENDPOINTS.warnings.url]: { status: 200, payload: oversizedWarningPayload },
+        }),
+        outputPath: "/virtual/latest.json",
+        fileSystem: files.implementation,
+        logger: { log: vi.fn(), warn: vi.fn() },
+      }),
+    ).rejects.toThrow(/refusing to replace cache above 65536 bytes/);
+
+    expect(files.implementation.mkdir).not.toHaveBeenCalled();
+    expect(files.implementation.writeFile).not.toHaveBeenCalled();
+    expect(files.implementation.rename).not.toHaveBeenCalled();
+  });
+
+  it("atomically replaces one timestamp-consistent warning cache", async () => {
     const files = mockFileSystem();
     const generatedAt = "2026-08-09T15:15:00.000Z";
-    const warn = vi.fn();
     const cache = await fetchCwaData({
-      fetchImpl: mockFetch({
-        [CWA_ENDPOINTS.earthquake.url]: { status: 503 },
-        [CWA_ENDPOINTS.typhoon.url]: { status: 404 },
-      }),
+      fetchImpl: mockFetch(),
       outputPath: "/virtual/latest.json",
       now: () => new Date(generatedAt),
       fileSystem: files.implementation,
-      logger: { log: vi.fn(), warn },
+      logger: { log: vi.fn(), warn: vi.fn() },
     });
 
     expect(cache.generatedAt).toBe(generatedAt);
     expect(cache.payloads.generatedAt).toBe(generatedAt);
-    expect(cache.sources.find((source) => source.key === "earthquake")?.status).toBe("error");
-    expect(cache.sources.find((source) => source.key === "typhoon")?.status).toBe("error");
-    expect(warn).toHaveBeenCalledTimes(2);
     expect(files.calls[1]).toMatch(/^write:\/virtual\/latest\.json\..+\.tmp$/);
     expect(files.calls[2]).toMatch(/^rename:\/virtual\/latest\.json\..+\.tmp->\/virtual\/latest\.json$/);
     expect(JSON.parse(files.written).generatedAt).toBe(JSON.parse(files.written).payloads.generatedAt);

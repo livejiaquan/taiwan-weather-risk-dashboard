@@ -1,4 +1,5 @@
 import { mkdir, rename, writeFile } from "node:fs/promises";
+import { Buffer } from "node:buffer";
 import { dirname, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { CWA_ENDPOINTS, type CwaSourceKey } from "../src/lib/cwaAdapter";
@@ -41,6 +42,8 @@ interface FetchDataOptions {
   fetchImpl?: typeof fetch;
   outputPath?: string;
   now?: () => Date;
+  timeoutMs?: number;
+  retryDelayMs?: number;
   fileSystem?: CacheFileSystem;
   logger?: CacheLogger;
 }
@@ -52,6 +55,10 @@ interface SourceResult {
 }
 
 const DEFAULT_OUTPUT_PATH = resolve("public/data/latest.json");
+const DEFAULT_TIMEOUT_MS = 8000;
+const DEFAULT_RETRY_DELAY_MS = 250;
+const MAX_CACHE_BYTES = 64 * 1024;
+const CACHE_SOURCE_KEYS: CwaSourceKey[] = ["warnings"];
 const CRITICAL_SOURCE_KEYS = new Set<CwaSourceKey>(["warnings"]);
 
 const defaultFileSystem: CacheFileSystem = {
@@ -265,10 +272,16 @@ export async function main(options: FetchDataOptions = {}): Promise<CacheDocumen
   const fileSystem = options.fileSystem ?? defaultFileSystem;
   const logger = options.logger ?? console;
   const generatedAt = (options.now ?? (() => new Date()))().toISOString();
+  const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const retryDelayMs = options.retryDelayMs ?? DEFAULT_RETRY_DELAY_MS;
 
-  const entries = Object.entries(CWA_ENDPOINTS) as Array<[CwaSourceKey, (typeof CWA_ENDPOINTS)[CwaSourceKey]]>;
+  const entries = CACHE_SOURCE_KEYS.map(
+    (key) => [key, CWA_ENDPOINTS[key]] as const,
+  );
   const results = await Promise.all(
-    entries.map(([key, endpoint]) => fetchSource(key, endpoint, fetchImpl)),
+    entries.map(([key, endpoint]) =>
+      fetchSource(key, endpoint, fetchImpl, timeoutMs, retryDelayMs),
+    ),
   );
 
   const criticalFailures = results.filter(
@@ -281,14 +294,6 @@ export async function main(options: FetchDataOptions = {}): Promise<CacheDocumen
     throw new Error(`Critical CWA validation failed; refusing to replace cache. ${failures}`);
   }
 
-  results
-    .filter((result) => !CRITICAL_SOURCE_KEYS.has(result.key) && result.source.status === "error")
-    .forEach((result) =>
-      logger.warn(
-        `Optional CWA source ${result.key}: ${result.source.status}${result.source.error ? ` (${result.source.error})` : ""}`,
-      ),
-    );
-
   const payloadFor = (key: CwaSourceKey) => results.find((result) => result.key === key)?.payload ?? null;
   const sources: CachedSource[] = results.map((result) => result.source);
 
@@ -298,16 +303,23 @@ export async function main(options: FetchDataOptions = {}): Promise<CacheDocumen
     payloads: {
       generatedAt,
       warningPayload: payloadFor("warnings"),
-      rainfallPayload: payloadFor("rainfall"),
-      weatherPayload: payloadFor("weather"),
-      earthquakePayload: payloadFor("earthquake"),
-      typhoonPayload: payloadFor("typhoon"),
+      rainfallPayload: null,
+      weatherPayload: null,
+      earthquakePayload: null,
+      typhoonPayload: null,
     },
   };
 
   const tempPath = `${outputPath}.${process.pid}.${generatedAt.replaceAll(/[^0-9]/g, "")}.tmp`;
+  const contents = `${JSON.stringify(cache)}\n`;
+  const cacheBytes = Buffer.byteLength(contents);
+  if (cacheBytes > MAX_CACHE_BYTES) {
+    throw new Error(
+      `Warning cache is ${cacheBytes} bytes; refusing to replace cache above ${MAX_CACHE_BYTES} bytes.`,
+    );
+  }
   await fileSystem.mkdir(dirname(outputPath));
-  await fileSystem.writeFile(tempPath, `${JSON.stringify(cache)}\n`);
+  await fileSystem.writeFile(tempPath, contents);
   await fileSystem.rename(tempPath, outputPath);
 
   const successfulCount = results.filter((result) => result.source.status === "success").length;
@@ -319,13 +331,11 @@ async function fetchSource(
   key: CwaSourceKey,
   endpoint: (typeof CWA_ENDPOINTS)[CwaSourceKey],
   fetchImpl: typeof fetch,
+  timeoutMs: number,
+  retryDelayMs: number,
 ): Promise<SourceResult> {
   try {
-    const response = await fetchImpl(endpoint.url);
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-    const payload: unknown = await response.json();
+    const payload = await fetchJsonWithRetry(endpoint.url, fetchImpl, timeoutMs, retryDelayMs);
     validateSource(key, payload);
     return {
       key,
@@ -352,6 +362,42 @@ async function fetchSource(
       },
     };
   }
+}
+
+async function fetchJsonWithRetry(
+  url: string,
+  fetchImpl: typeof fetch,
+  timeoutMs: number,
+  retryDelayMs: number,
+): Promise<unknown> {
+  try {
+    return await fetchJson(url, fetchImpl, timeoutMs);
+  } catch (error) {
+    if (!isTransientFetchError(error)) throw error;
+    if (retryDelayMs > 0) {
+      await new Promise((resolvePromise) => globalThis.setTimeout(resolvePromise, retryDelayMs));
+    }
+    return fetchJson(url, fetchImpl, timeoutMs);
+  }
+}
+
+async function fetchJson(url: string, fetchImpl: typeof fetch, timeoutMs: number): Promise<unknown> {
+  const controller = new AbortController();
+  const timeout = globalThis.setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetchImpl(url, { signal: controller.signal });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return await response.json();
+  } finally {
+    globalThis.clearTimeout(timeout);
+  }
+}
+
+function isTransientFetchError(error: unknown): boolean {
+  if (error instanceof TypeError) return true;
+  if (error instanceof Error && error.name === "AbortError") return true;
+  return error instanceof Error && /^HTTP 5\d\d$/.test(error.message);
 }
 
 function validateSource(key: CwaSourceKey, payload: unknown): void {
