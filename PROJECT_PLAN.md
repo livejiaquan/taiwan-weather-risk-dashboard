@@ -51,7 +51,7 @@ The product never declares a place safe. Official warnings, observations, and si
 - [x] Add bounded generator retry/timeout, CI lint, artifact validation, and a workflow timeout.
 - [x] Move the cron off minute `0` and document that GitHub schedule is best effort.
 - [ ] Consolidate the duplicated browser/generator warning validator.
-- [ ] Start cache and live requests concurrently with deterministic live-result precedence.
+- [x] Start cache and live requests concurrently with deterministic live-result precedence.
 - [ ] Add an external freshness check and named recovery procedure.
 
 ## Validation Iteration — Prove Differentiation

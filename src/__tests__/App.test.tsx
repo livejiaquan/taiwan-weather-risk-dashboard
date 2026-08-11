@@ -150,6 +150,16 @@ function arrangeResult(result: RiskDashboardLoadResult, cached: RiskDashboardLoa
   mockedLoadRiskDashboardData.mockResolvedValue(result);
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
+
 describe("App trust-first warning contract", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -173,6 +183,107 @@ describe("App trust-first warning contract", () => {
     expect(screen.queryByText(/未列有效縣市警特報/)).not.toBeInTheDocument();
     expect(screen.queryByText("整體安全")).not.toBeInTheDocument();
     expect(screen.queryByText(/官方來源讀取正常/)).not.toBeInTheDocument();
+  });
+
+  it("starts direct official retrieval immediately even when cache is still pending", async () => {
+    window.history.replaceState(null, "", "/?county=臺北市");
+    const cache = deferred<RiskDashboardLoadResult | null>();
+    mockedLoadCachedRiskDashboardData.mockReturnValue(cache.promise);
+    mockedLoadRiskDashboardData.mockResolvedValue(makeCurrentResult());
+
+    render(<App />);
+
+    expect(mockedLoadCachedRiskDashboardData).toHaveBeenCalledOnce();
+    expect(mockedLoadRiskDashboardData).toHaveBeenCalledOnce();
+    expect(await screen.findByRole("heading", { name: "臺北市 未列有效縣市警特報" })).toBeInTheDocument();
+
+    await act(async () => {
+      cache.resolve(makeCachedEmptyWarningResult());
+      await cache.promise;
+    });
+    expect(screen.getByRole("heading", { name: "臺北市 未列有效縣市警特報" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "臺北市 現況仍需確認" })).not.toBeInTheDocument();
+  });
+
+  it("does not briefly accept a cache result when cache and live settle in the same turn", async () => {
+    window.history.replaceState(null, "", "/?county=臺北市");
+    mockedLoadCachedRiskDashboardData.mockResolvedValue(makeCachedEmptyWarningResult());
+    mockedLoadRiskDashboardData.mockResolvedValue(makeCurrentResult());
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "臺北市 未列有效縣市警特報" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "臺北市 現況仍需確認" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/目前顯示時效內快取/)).not.toBeInTheDocument();
+  });
+
+  it("shows a valid cache only while live data is unresolved, then replaces it with live truth", async () => {
+    window.history.replaceState(null, "", "/?county=臺北市");
+    const live = deferred<RiskDashboardLoadResult>();
+    mockedLoadCachedRiskDashboardData.mockResolvedValue(makeCachedEmptyWarningResult());
+    mockedLoadRiskDashboardData.mockReturnValue(live.promise);
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "臺北市 現況仍需確認" })).toBeInTheDocument();
+    await act(async () => {
+      live.resolve(makeCurrentResult());
+      await live.promise;
+    });
+    expect(await screen.findByRole("heading", { name: "臺北市 未列有效縣市警特報" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "臺北市 現況仍需確認" })).not.toBeInTheDocument();
+  });
+
+  it("replaces an interim cache with the fail-closed fatal state when live cannot confirm warnings", async () => {
+    window.history.replaceState(null, "", "/?county=臺北市");
+    const live = deferred<RiskDashboardLoadResult>();
+    const fatalResult: RiskDashboardLoadResult = {
+      ...makeUnavailableWarningResult(),
+      snapshot: null,
+      fatal: true,
+    };
+    mockedLoadCachedRiskDashboardData.mockResolvedValue(makeCachedEmptyWarningResult());
+    mockedLoadRiskDashboardData.mockReturnValue(live.promise);
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "臺北市 現況仍需確認" })).toBeInTheDocument();
+    await act(async () => {
+      live.resolve(fatalResult);
+      await live.promise;
+    });
+    expect(await screen.findByRole("heading", { name: "目前無法確認官方警特報" })).toBeInTheDocument();
+    expect(screen.getByText(/無法取得 CWA 即時資料，也沒有在時效內的可用快取/)).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "臺北市 現況仍需確認" })).not.toBeInTheDocument();
+    expect(screen.queryByText("整體安全")).not.toBeInTheDocument();
+  });
+
+  it("keeps a newer manual refresh authoritative when an older live request settles late", async () => {
+    window.history.replaceState(null, "", "/?county=臺北市");
+    const initialLive = deferred<RiskDashboardLoadResult>();
+    const refreshedWarning: WeatherWarning = {
+      countyName: "臺北市",
+      geocode: "63",
+      phenomena: "豪雨",
+      significance: "特報",
+      startTime: "2026-05-30T00:00:00+08:00",
+      endTime: "2026-05-30T02:00:00+08:00",
+      affectedAreas: ["山區"],
+    };
+    mockedLoadCachedRiskDashboardData.mockResolvedValue(makeCachedEmptyWarningResult());
+    mockedLoadRiskDashboardData.mockReturnValueOnce(initialLive.promise).mockResolvedValueOnce(makeCurrentResult([refreshedWarning]));
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "臺北市 現況仍需確認" })).toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole("button", { name: "更新資料" })[0]);
+    expect(await screen.findByRole("heading", { name: "臺北市 有 1 項警特報" })).toBeInTheDocument();
+
+    await act(async () => {
+      initialLive.resolve(makeCurrentResult());
+      await initialLive.promise;
+    });
+    expect(screen.getByRole("heading", { name: "臺北市 有 1 項警特報" })).toBeInTheDocument();
   });
 
   it("does not show a safe or official-normal conclusion when the warning source is unavailable", async () => {

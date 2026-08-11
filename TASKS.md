@@ -31,7 +31,7 @@ The original portfolio-first build is superseded by the public-product mission i
 - [ ] Consolidate duplicated browser/generator warning validators into one shared contract.
 - [x] Add per-request timeout/one retry to cache generation and a 15-minute workflow job timeout.
 - [x] Remove the unused legacy score/`safe`/national-answer model so it cannot regress into the UI.
-- [ ] Start cache and live requests concurrently without allowing a late cache result to replace live truth.
+- [x] Start cache and live requests concurrently without allowing a late cache result to replace live truth.
 
 ## Iteration 3 — Validate Real User Value
 
