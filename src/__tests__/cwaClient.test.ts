@@ -96,6 +96,33 @@ describe("loadRiskDashboardData", () => {
     expect(result.fatal).toBe(false);
   });
 
+  it("allows small source clock skew without hiding implausible future observations", async () => {
+    const loadRainfallAt = (observedAt: string) =>
+      loadRiskDashboardData({
+        fetcher: async (url) => {
+          const payload = validPayloadFor(url);
+          if (url.includes("O-A0002-001")) {
+            payload.cwaopendata.dataset.Station[0].ObsTime.DateTime = observedAt;
+          }
+          return new Response(JSON.stringify(payload));
+        },
+        now: () => new Date("2026-05-30T00:30:00+08:00"),
+        cacheUrl: null,
+      });
+
+    const withinTolerance = await loadRainfallAt("2026-05-30T00:33:00+08:00");
+    const atTolerance = await loadRainfallAt("2026-05-30T00:35:00.000+08:00");
+    const beyondTolerance = await loadRainfallAt("2026-05-30T00:35:00.001+08:00");
+    const implausiblyFuture = await loadRainfallAt("2026-05-30T01:00:00+08:00");
+
+    expect(withinTolerance.sources.find((source) => source.key === "rainfall")?.stale).toBe(false);
+    expect(atTolerance.sources.find((source) => source.key === "rainfall")?.stale).toBe(false);
+    expect(beyondTolerance.sources.find((source) => source.key === "rainfall")?.stale).toBe(true);
+    expect(implausiblyFuture.sources.find((source) => source.key === "rainfall")?.status).toBe("success");
+    expect(implausiblyFuture.sources.find((source) => source.key === "rainfall")?.stale).toBe(true);
+    expect(implausiblyFuture.degraded).toBe(true);
+  });
+
   it("retries a transient live-source failure before falling back to cache", async () => {
     const attempts = new Map<string, number>();
 

@@ -65,6 +65,8 @@ const SOURCE_STALE_HOURS: Record<CwaSourceKey, number> = {
   typhoon: 12,
 };
 
+const MAX_FUTURE_SKEW_MINUTES = 5;
+
 export async function loadRiskDashboardData(
   options: LoadRiskDashboardOptions = {},
 ): Promise<RiskDashboardLoadResult> {
@@ -388,7 +390,8 @@ function isStale(value: string | undefined, now: Date, staleHours: number): bool
   const timestamp = new Date(value).getTime();
   if (!Number.isFinite(timestamp)) return true;
   const diffHours = (now.getTime() - timestamp) / (1000 * 60 * 60);
-  return diffHours > staleHours;
+  const futureSkewHours = MAX_FUTURE_SKEW_MINUTES / 60;
+  return diffHours > staleHours || diffHours < -futureSkewHours;
 }
 
 function optionalString(value: unknown): string | undefined {
