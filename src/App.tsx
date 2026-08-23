@@ -146,8 +146,9 @@ export function App() {
   };
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(20,184,166,0.18),_transparent_32rem),linear-gradient(135deg,_#f8fafc_0%,_#eef2f7_52%,_#fff7ed_100%)] text-slate-900">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-4 sm:px-6 lg:px-8">
+    <main className="min-h-screen bg-[radial-gradient(circle_at_92%_0%,_rgba(186,230,253,0.5),_transparent_28rem),radial-gradient(circle_at_0%_20%,_rgba(15,118,110,0.08),_transparent_30rem),_#F6F7F2] text-ink">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-4 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
+        <SiteHeader />
         <Hero
           state={state}
           result={state.data}
@@ -190,6 +191,21 @@ export function App() {
   );
 }
 
+function SiteHeader() {
+  return (
+    <header className="flex items-center justify-between gap-4 border-b border-line/80 pb-4 sm:pb-5">
+      <a href="#county-focus" className="inline-flex items-center gap-3 rounded-xl focus:outline-none" aria-label="台灣生活資料誌：天氣風險與警特報首頁">
+        <span className="grid h-10 w-10 place-items-center rounded-[14px] bg-cobalt-700 text-sm font-black tracking-tight text-white shadow-card" aria-hidden="true">台</span>
+        <span>
+          <span className="block text-xs font-bold tracking-[0.12em] text-teal-800">台灣生活資料誌</span>
+          <span className="block text-sm font-black tracking-tight text-ink sm:text-base">天氣風險與警特報</span>
+        </span>
+      </a>
+      <span className="hidden rounded-full border border-sky-100 bg-white/70 px-3 py-1.5 text-xs font-semibold text-slate-600 sm:block">資料優先 · CWA 公開資料</span>
+    </header>
+  );
+}
+
 function Hero({
   state,
   result,
@@ -221,24 +237,24 @@ function Hero({
   const primaryWarning = selectedCounty?.warnings[0];
 
   return (
-    <section id="county-focus" className="overflow-hidden rounded-[1.5rem] border border-white/70 bg-white/90 shadow-soft backdrop-blur">
-      <div className="grid gap-6 p-5 sm:p-6 lg:grid-cols-[1.05fr_0.95fr] lg:p-8">
+    <section id="county-focus" className="overflow-hidden rounded-[20px] border border-line/80 bg-white/85 shadow-soft backdrop-blur">
+      <div className="grid gap-6 p-5 sm:p-7 lg:grid-cols-[1.05fr_0.95fr] lg:p-9">
         <div className="flex flex-col justify-between gap-7">
           <div className="space-y-5">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-2 rounded-full border border-teal-200 bg-teal-50 px-3 py-1 text-sm font-semibold text-teal-900">
+              <span className="inline-flex items-center gap-2 rounded-full border border-teal-100 bg-teal-50 px-3 py-1 text-sm font-semibold text-teal-900">
                 <Navigation className="h-4 w-4" aria-hidden="true" />
                 出門前
               </span>
-              <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-sm font-medium text-slate-600">
+              <span className="inline-flex items-center gap-2 rounded-full border border-line/70 bg-white/70 px-3 py-1 text-sm font-medium text-slate-600">
                 <Globe2 className="h-4 w-4" aria-hidden="true" />
                 民間整理 · CWA 公開資料
               </span>
             </div>
 
             <div className="max-w-3xl">
-              <p className="mb-2 hidden text-sm font-semibold uppercase tracking-[0.16em] text-slate-500 sm:block">Taiwan county warning check</p>
-              <h1 className="text-3xl font-black leading-tight text-slate-950 sm:text-5xl">
+              <p className="mb-2 hidden text-xs font-bold uppercase tracking-[0.18em] text-cobalt-700 sm:block">Destination-first warning check</p>
+              <h1 className="text-3xl font-black leading-[1.18] tracking-tight text-ink sm:text-5xl">
                 先看目的地，現在有沒有有效警特報
               </h1>
               <p className={`mt-4 max-w-2xl text-base leading-7 text-slate-700 sm:text-lg sm:leading-8 ${selectedCounty ? "hidden sm:block" : ""}`}>
@@ -256,7 +272,7 @@ function Hero({
                   id="county-select"
                   value={selectedCountyName}
                   onChange={(event) => onSelectCounty(event.target.value)}
-                  className="min-h-14 w-full appearance-none rounded-2xl border border-slate-300 bg-white py-3 pl-12 pr-10 text-base font-bold text-slate-950 shadow-card outline-none transition focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
+                  className="min-h-14 w-full appearance-none rounded-2xl border border-line bg-white py-3 pl-12 pr-10 text-base font-bold text-ink shadow-card outline-none transition duration-200 focus:border-cobalt-600 focus:ring-4 focus:ring-cobalt-100"
                 >
                   <option value="">選擇縣市</option>
                   {COUNTIES.map((county) => (
@@ -275,7 +291,7 @@ function Hero({
               type="button"
               onClick={() => onRefresh()}
               disabled={state.status === "loading"}
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-card transition hover:-translate-y-0.5 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-cobalt-700 px-4 py-2.5 text-sm font-semibold text-white shadow-card transition duration-200 hover:-translate-y-0.5 hover:bg-cobalt-800 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <RefreshCw className={`h-4 w-4 ${state.status === "loading" ? "animate-spin" : ""}`} aria-hidden="true" />
               {state.status === "loading" ? "更新中" : "更新資料"}
@@ -297,7 +313,7 @@ function Hero({
           </div>
         </div>
 
-        <div className={`rounded-3xl border p-5 sm:p-6 ${presentation.containerClass}`} aria-live="polite">
+        <div className={`rounded-[20px] border p-5 sm:p-6 ${presentation.containerClass}`} aria-live="polite">
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className={`text-sm font-black ${presentation.eyebrowClass}`}>{presentation.eyebrow}</p>
@@ -364,7 +380,7 @@ function Hero({
             href={officialWarningUrl(primaryWarning)}
             target="_blank"
             rel="noreferrer"
-            className="mt-5 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 text-sm font-semibold text-white transition hover:bg-slate-800"
+            className="mt-5 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-cobalt-700 px-4 text-sm font-semibold text-white transition duration-200 hover:bg-cobalt-800"
           >
             到 CWA 官方頁確認
             <ExternalLink className="h-4 w-4" aria-hidden="true" />
@@ -510,7 +526,7 @@ function OverviewStats({ snapshot, result }: { snapshot: RiskSnapshot; result: R
             : "請直接查 CWA 官方頁",
       source: sourceSummary(result, "warnings"),
       icon: AlertTriangle,
-      accent: "from-rose-600 to-orange-500",
+      accent: "from-cobalt-700 to-sky-600",
     },
     {
       label: "24 小時最大雨量",
@@ -520,7 +536,7 @@ function OverviewStats({ snapshot, result }: { snapshot: RiskSnapshot; result: R
         : "雨量站未回傳",
       source: sourceSummary(result, "rainfall"),
       icon: CloudRain,
-      accent: "from-sky-600 to-teal-500",
+      accent: "from-sky-700 to-cobalt-600",
     },
     {
       label: "最大陣風觀測",
@@ -530,7 +546,7 @@ function OverviewStats({ snapshot, result }: { snapshot: RiskSnapshot; result: R
         : "氣象站未回傳",
       source: sourceSummary(result, "weather"),
       icon: Wind,
-      accent: "from-indigo-600 to-cyan-500",
+      accent: "from-cobalt-800 to-sky-600",
     },
     {
       label: "最高溫觀測",
@@ -540,14 +556,14 @@ function OverviewStats({ snapshot, result }: { snapshot: RiskSnapshot; result: R
         : "氣象站未回傳",
       source: sourceSummary(result, "weather"),
       icon: Thermometer,
-      accent: "from-amber-500 to-red-500",
+      accent: "from-teal-700 to-sky-600",
     },
   ];
 
   return (
     <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="警特報與觀測摘要">
       {stats.map((stat) => (
-        <div key={stat.label} className="overflow-hidden rounded-2xl border border-white/70 bg-white p-5 shadow-card">
+        <div key={stat.label} className="overflow-hidden rounded-2xl border border-line/80 bg-white/90 p-5 shadow-card">
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-sm font-semibold text-slate-500">{stat.label}</p>
@@ -585,14 +601,14 @@ function InterpretationGuide() {
   ];
 
   return (
-    <section className="rounded-2xl border border-white/70 bg-white p-5 shadow-card">
+    <section className="rounded-2xl border border-line/80 bg-white/90 p-5 shadow-card">
       <div className="mb-4">
         <h2 className="text-xl font-black text-slate-950">這頁怎麼判讀</h2>
         <p className="mt-1 text-sm leading-6 text-slate-500">官方發布、本站整理與背景紀錄分開呈現，避免把不同語義合成看似精準的「安全分數」。</p>
       </div>
       <div className="grid gap-3 md:grid-cols-3">
         {items.map((item) => (
-          <div key={item.title} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <div key={item.title} className="rounded-2xl border border-line/70 bg-[#F6F7F2] p-4">
             <item.icon className="h-5 w-5 text-teal-700" aria-hidden="true" />
             <h3 className="mt-3 font-black text-slate-950">{item.title}</h3>
             <p className="mt-2 text-sm leading-6 text-slate-600">{item.detail}</p>
@@ -624,7 +640,7 @@ function CountySection({
   };
 
   return (
-    <section className="rounded-2xl border border-white/70 bg-white p-4 shadow-card sm:p-5">
+    <section className="rounded-2xl border border-line/80 bg-white/90 p-4 shadow-card sm:p-5">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h2 className="text-xl font-black text-slate-950">各縣市警特報與觀測</h2>
@@ -639,8 +655,8 @@ function CountySection({
               onClick={() => setRegion(option)}
               className={`min-h-10 rounded-xl border px-3 text-sm font-semibold transition ${
                 region === option
-                  ? "border-slate-950 bg-slate-950 text-white"
-                  : "border-slate-200 bg-white text-slate-600 hover:border-slate-400"
+                  ? "border-cobalt-700 bg-cobalt-700 text-white"
+                  : "border-line bg-white text-slate-600 hover:border-cobalt-600"
               }`}
             >
               {REGION_LABELS[option]}
@@ -669,7 +685,7 @@ function CountyCard({ county, warningState, selected, onSelect }: { county: Coun
   const status = countyCardStatus(warningState, hasWarning, county.warnings.length);
 
   return (
-    <article className={`rounded-2xl border p-4 shadow-card ${status.containerClass} ${selected ? "ring-2 ring-teal-600 ring-offset-2" : ""}`}>
+    <article className={`rounded-2xl border p-4 shadow-card ${status.containerClass} ${selected ? "ring-2 ring-cobalt-600 ring-offset-2 ring-offset-paper" : ""}`}>
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="text-lg font-black text-slate-950">{county.countyName}</h3>
@@ -697,7 +713,7 @@ function CountyCard({ county, warningState, selected, onSelect }: { county: Coun
         <MiniMetric label="高溫" value={formatMetric(county.metrics.maxTemperature, "°C")} />
       </div>
 
-      <button type="button" onClick={onSelect} className="mt-4 min-h-10 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm font-bold text-slate-700 hover:border-slate-500">
+      <button type="button" onClick={onSelect} className="mt-4 min-h-10 w-full rounded-xl border border-line bg-white px-3 text-sm font-bold text-slate-700 transition duration-200 hover:border-cobalt-600 hover:text-cobalt-800">
         查看這個縣市
       </button>
     </article>
@@ -750,7 +766,7 @@ function WarningSection({
       ) : (
         <div className="grid gap-3 md:grid-cols-2">
           {uniqueWarnings.map((warning) => (
-            <article key={`${warning.countyName}-${warning.phenomena}-${warning.startTime}`} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <article key={`${warning.countyName}-${warning.phenomena}-${warning.startTime}`} className="rounded-xl border border-line/70 bg-[#F6F7F2] p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="font-black text-slate-950">{warning.countyName}</div>
                 <div className="rounded-full bg-white px-2.5 py-1 text-xs font-bold text-slate-700">
@@ -839,7 +855,7 @@ function SignalLine({ label, value }: { label: string; value: string }) {
 
 function SourceFooter({ sources }: { sources: SourceStatus[] }) {
   return (
-    <footer className="rounded-2xl border border-white/70 bg-white/90 p-5 text-sm text-slate-600 shadow-card">
+    <footer className="rounded-2xl border border-line/80 bg-white/90 p-5 text-sm text-slate-600 shadow-card">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div className="max-w-3xl">
           <h2 className="text-base font-black text-slate-950">資料來源、更新時間與限制</h2>
@@ -847,7 +863,7 @@ function SourceFooter({ sources }: { sources: SourceStatus[] }) {
             本頁是民間整理工具，不是政府官方服務，也不代表中央氣象署背書。官方警特報保留其有效時間與影響範圍；本站提供的行動文字與觀測整理不是官方安全判定。
           </p>
         </div>
-        <a href="https://opendata.cwa.gov.tw/" target="_blank" rel="noreferrer" className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 font-semibold text-slate-700 hover:border-slate-400">
+        <a href="https://opendata.cwa.gov.tw/" target="_blank" rel="noreferrer" className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-line bg-white px-4 font-semibold text-slate-700 transition duration-200 hover:border-cobalt-600">
           CWA 開放資料
           <ExternalLink className="h-4 w-4" aria-hidden="true" />
         </a>
@@ -863,7 +879,7 @@ function SourceList({ sources }: { sources: SourceStatus[] }) {
       {sources.map((source) => {
         const status = sourceDisplay(source);
         return (
-          <div key={source.key} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+          <div key={source.key} className="rounded-xl border border-line/70 bg-[#F6F7F2] px-3 py-3">
             <div className="flex items-start justify-between gap-2">
               <div>
                 <p className="font-bold text-slate-800">{source.label}</p>
@@ -891,9 +907,9 @@ function SourceList({ sources }: { sources: SourceStatus[] }) {
 
 function Card({ title, icon: Icon, children }: { title: string; icon: typeof Activity; children: ReactNode }) {
   return (
-    <section className="rounded-2xl border border-white/70 bg-white p-5 shadow-card">
+    <section className="rounded-2xl border border-line/80 bg-white/90 p-5 shadow-card">
       <div className="mb-4 flex items-center gap-2">
-        <div className="rounded-xl bg-slate-950 p-2 text-white">
+        <div className="rounded-xl bg-cobalt-700 p-2 text-white">
           <Icon className="h-4 w-4" aria-hidden="true" />
         </div>
         <h2 className="text-lg font-black text-slate-950">{title}</h2>

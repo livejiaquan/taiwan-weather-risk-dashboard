@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@400;500;700;900&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -6,7 +6,9 @@
 
 :root {
   color-scheme: light;
-  font-family: "Noto Sans TC", ui-sans-serif, system-ui, sans-serif;
+  font-family: "Inter", "Noto Sans TC", ui-sans-serif, system-ui, sans-serif;
+  color: #10211c;
+  background: #f6f7f2;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -19,11 +21,13 @@
 
 html {
   min-width: 320px;
-  background: #f8fafc;
+  background: #f6f7f2;
+  scroll-behavior: smooth;
 }
 
 body {
   margin: 0;
+  background: #f6f7f2;
 }
 
 button,
@@ -32,11 +36,23 @@ a {
 }
 
 button:focus-visible,
-a:focus-visible {
-  outline: 3px solid rgba(20, 184, 166, 0.45);
+a:focus-visible,
+select:focus-visible {
+  outline: 3px solid rgba(37, 99, 235, 0.62);
   outline-offset: 3px;
 }
 
 ::selection {
-  background: rgba(20, 184, 166, 0.22);
+  background: rgba(37, 99, 235, 0.18);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
