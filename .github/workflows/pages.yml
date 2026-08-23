@@ -39,6 +39,10 @@ jobs:
 
       - name: Refresh CWA cache
         run: npm run fetch:data
+        # The generator refuses invalid upstream warning schemas and leaves the
+        # checked-in last-known-good cache untouched. Deploy that validated
+        # fallback instead of turning a CWA schema incident into an outage.
+        continue-on-error: true
 
       - name: Test
         run: npm run test
