@@ -262,10 +262,15 @@ function hasValidWarningHazard(value: unknown): boolean {
   if (new Date(startTime).getTime() >= new Date(endTime).getTime()) return false;
 
   if (!hasOwn(value, "hazard")) return true;
-  if (!isRecord(value.hazard) || !isRecord(value.hazard.info)) return false;
-  if (!hasOwn(value.hazard.info, "affectedAreas")) return true;
+  const details = asArray(value.hazard);
+  return details.length > 0 && details.every(hasValidWarningHazardDetail);
+}
 
-  const affectedAreas = value.hazard.info.affectedAreas;
+function hasValidWarningHazardDetail(value: unknown): boolean {
+  if (!isRecord(value) || !isRecord(value.info)) return false;
+  if (!hasOwn(value.info, "affectedAreas")) return true;
+
+  const affectedAreas = value.info.affectedAreas;
   if (!isRecord(affectedAreas) || !hasOwn(affectedAreas, "location")) return false;
 
   const affectedLocations = asArray(affectedAreas.location);

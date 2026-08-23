@@ -33,14 +33,10 @@ describe("normalizeWarningData", () => {
                       startTime: "2026-05-29T22:41:00+08:00",
                       endTime: "2026-05-30T05:00:00+08:00",
                     },
-                    hazard: {
-                      info: {
-                        phenomena: "大雨",
-                        affectedAreas: {
-                          location: [{ locationName: "山區" }, { locationName: "平地" }],
-                        },
-                      },
-                    },
+                    hazard: [
+                      { info: { affectedAreas: { location: [{ locationName: "山區" }] } } },
+                      { info: { affectedAreas: { location: { locationName: "平地" } } } },
+                    ],
                   },
                 ],
               },

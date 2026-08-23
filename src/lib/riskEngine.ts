@@ -258,8 +258,11 @@ export function buildRiskSnapshot(input: RiskSnapshotInput): RiskSnapshot {
 }
 
 function normalizeAffectedAreas(hazard: any): string[] {
-  const locations = asArray(hazard?.hazard?.info?.affectedAreas?.location);
-  return locations.map((location) => stringOrEmpty(location?.locationName)).filter(Boolean);
+  return asArray(hazard?.hazard).flatMap((detail) =>
+    asArray(detail?.info?.affectedAreas?.location)
+      .map((location) => stringOrEmpty(location?.locationName))
+      .filter(Boolean),
+  );
 }
 
 function asArray<T>(value: T | T[] | null | undefined): T[] {

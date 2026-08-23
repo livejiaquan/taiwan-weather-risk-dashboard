@@ -543,6 +543,56 @@ describe("loadRiskDashboardData", () => {
     }
   });
 
+  it("accepts a live warning payload with a non-empty array of validated hazard details", async () => {
+    const hazardCondition = heavyRainHazard("2026-05-29T22:41:00+08:00", "2026-05-30T05:00:00+08:00");
+    const warningPayload = completeWarningPayload("2026-05-30T00:00:00+08:00", {
+      臺北市: {
+        hazards: {
+          ...hazardCondition.hazards,
+          hazard: [
+            { info: { affectedAreas: { location: [{ locationName: "臺北市山區" }] } } },
+            { info: { affectedAreas: { location: { locationName: "臺北市平地" } } } },
+          ],
+        },
+      },
+    });
+
+    const result = await loadRiskDashboardData({
+      fetcher: async (url) =>
+        new Response(JSON.stringify(url.includes("W-C0033-001") ? warningPayload : validPayloadFor(url))),
+      now: () => new Date("2026-05-30T00:30:00+08:00"),
+      cacheUrl: null,
+    });
+
+    expect(result.sources.find((source) => source.key === "warnings")).toMatchObject({
+      status: "success",
+      provenance: "live",
+    });
+    expect(result.warnings.coverage).toBe("current");
+  });
+
+  it.each([
+    ["null", null],
+    ["empty", []],
+    ["a non-record detail", [null]],
+    ["an invalid affected location", [{ info: { affectedAreas: { location: [{ locationName: " " }] } } }]],
+  ])("rejects a live warning payload with %s in its hazard-detail array", async (_label, details) => {
+    const hazardCondition = heavyRainHazard("2026-05-29T22:41:00+08:00", "2026-05-30T05:00:00+08:00");
+    const warningPayload = completeWarningPayload("2026-05-30T00:00:00+08:00", {
+      臺北市: { hazards: { ...hazardCondition.hazards, hazard: details } },
+    });
+
+    const result = await loadRiskDashboardData({
+      fetcher: async (url) =>
+        new Response(JSON.stringify(url.includes("W-C0033-001") ? warningPayload : validPayloadFor(url))),
+      now: () => new Date("2026-05-30T00:30:00+08:00"),
+      cacheUrl: null,
+    });
+
+    expect(result.sources.find((source) => source.key === "warnings")).toMatchObject({ status: "error" });
+    expect(result.warnings.coverage).toBe("unavailable");
+  });
+
   it("retries a transient HTTP server error", async () => {
     let rainfallAttempts = 0;
 

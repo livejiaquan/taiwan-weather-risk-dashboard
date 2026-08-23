@@ -188,40 +188,41 @@ function validateWarningHazardConditions(location: Record<string, unknown>, loca
 function validateAffectedAreas(hazard: Record<string, unknown>, hazardPath: string): void {
   if (!hasOwn(hazard, "hazard")) return;
 
-  const detail = requireRecord(hazard.hazard, `${hazardPath}.hazard`);
-  const detailInfo = requireRecord(detail.info, `${hazardPath}.hazard.info`);
-  if (!hasOwn(detailInfo, "affectedAreas")) return;
-
-  const affectedAreas = requireRecord(
-    detailInfo.affectedAreas,
-    `${hazardPath}.hazard.info.affectedAreas`,
-  );
-  if (!hasOwn(affectedAreas, "location")) {
-    throw new Error(`${hazardPath}.hazard.info.affectedAreas.location is required`);
+  const rawDetails = hazard.hazard;
+  const details = Array.isArray(rawDetails) ? rawDetails : isRecord(rawDetails) ? [rawDetails] : null;
+  if (!details || details.length === 0) {
+    throw new Error(`${hazardPath}.hazard must be an object or non-empty array`);
   }
 
-  const rawLocations = affectedAreas.location;
-  const locations = Array.isArray(rawLocations)
-    ? rawLocations
-    : isRecord(rawLocations)
-      ? [rawLocations]
-      : null;
-  if (!locations || locations.length === 0) {
-    throw new Error(
-      `${hazardPath}.hazard.info.affectedAreas.location must be an object or non-empty array`,
-    );
-  }
+  details.forEach((rawDetail, detailIndex) => {
+    const detailPath = `${hazardPath}.hazard[${detailIndex}]`;
+    const detail = requireRecord(rawDetail, detailPath);
+    const detailInfo = requireRecord(detail.info, `${detailPath}.info`);
+    if (!hasOwn(detailInfo, "affectedAreas")) return;
 
-  locations.forEach((rawLocation, index) => {
-    const location = requireRecord(
-      rawLocation,
-      `${hazardPath}.hazard.info.affectedAreas.location[${index}]`,
-    );
-    if (!isNonEmptyString(location.locationName)) {
+    const affectedAreas = requireRecord(detailInfo.affectedAreas, `${detailPath}.info.affectedAreas`);
+    if (!hasOwn(affectedAreas, "location")) {
+      throw new Error(`${detailPath}.info.affectedAreas.location is required`);
+    }
+
+    const rawLocations = affectedAreas.location;
+    const locations = Array.isArray(rawLocations)
+      ? rawLocations
+      : isRecord(rawLocations)
+        ? [rawLocations]
+        : null;
+    if (!locations || locations.length === 0) {
       throw new Error(
-        `${hazardPath}.hazard.info.affectedAreas.location[${index}].locationName is required`,
+        `${detailPath}.info.affectedAreas.location must be an object or non-empty array`,
       );
     }
+
+    locations.forEach((rawLocation, index) => {
+      const location = requireRecord(rawLocation, `${detailPath}.info.affectedAreas.location[${index}]`);
+      if (!isNonEmptyString(location.locationName)) {
+        throw new Error(`${detailPath}.info.affectedAreas.location[${index}].locationName is required`);
+      }
+    });
   });
 }
 

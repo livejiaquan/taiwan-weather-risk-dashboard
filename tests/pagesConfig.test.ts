@@ -298,6 +298,32 @@ describe("CWA cache payload validation", () => {
     ).toThrow();
   });
 
+  it("accepts a non-empty array of fully valid hazard details", () => {
+    const hazardDetails = [
+      { info: { affectedAreas: { location: [{ locationName: "花蓮縣山區" }] } } },
+      { info: { affectedAreas: { location: { locationName: "花蓮縣平地" } } } },
+    ];
+
+    expect(() =>
+      validateWarningPayload(
+        warningPayloadWithHazardConditions({ hazards: { ...validHazard(), hazard: hazardDetails } }),
+      ),
+    ).not.toThrow();
+  });
+
+  it.each([
+    ["null", null],
+    ["empty", []],
+    ["non-record detail", [null]],
+    ["detail with malformed affected locations", [{ info: { affectedAreas: { location: [] } } }]],
+  ])("rejects a %s hazard-detail array", (_label, hazard) => {
+    expect(() =>
+      validateWarningPayload(
+        warningPayloadWithHazardConditions({ hazards: { ...validHazard(), hazard } }),
+      ),
+    ).toThrow();
+  });
+
   it("requires a parseable warning sent time and a location key", () => {
     expect(() =>
       validateWarningPayload({ cwaopendata: { sent: "not-a-date", dataset: { location: null } } }),
