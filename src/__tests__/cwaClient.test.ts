@@ -292,7 +292,10 @@ describe("loadRiskDashboardData", () => {
         fetcher: async (url) => {
           const payload = validPayloadFor(url);
           if (url.includes("O-A0002-001")) {
-            payload.cwaopendata.dataset.Station[0].ObsTime.DateTime = observedAt;
+            const rainfallPayload = payload as {
+              cwaopendata: { dataset: { Station: Array<{ ObsTime: { DateTime: string } }> } };
+            };
+            rainfallPayload.cwaopendata.dataset.Station[0].ObsTime.DateTime = observedAt;
           }
           return new Response(JSON.stringify(payload));
         },
