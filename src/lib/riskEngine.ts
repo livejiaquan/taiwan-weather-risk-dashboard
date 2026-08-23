@@ -1,5 +1,3 @@
-export type RiskLevel = "safe" | "watch" | "elevated" | "high" | "stale";
-
 export interface CountyDefinition {
   countyName: string;
   geocode: string;
@@ -66,10 +64,7 @@ export interface CountyRisk {
   countyName: string;
   geocode: string;
   region: CountyDefinition["region"];
-  level: RiskLevel;
-  score: number;
   warnings: WeatherWarning[];
-  reasons: string[];
   metrics: {
     maxPast1h?: number;
     maxPast3h?: number;
@@ -77,20 +72,15 @@ export interface CountyRisk {
     maxTemperature?: number;
     maxWindSpeed?: number;
     maxGustSpeed?: number;
-    earthquakeIntensity?: number;
   };
 }
 
 export interface RiskSnapshot {
   generatedAt: string;
   national: {
-    level: RiskLevel;
-    score: number;
-    answer: string;
     activeWarningCountyCount: number;
   };
   counties: CountyRisk[];
-  attentionToday: string[];
   sections: {
     rainfall: {
       maxPast1h?: RankedRainfall;
@@ -194,7 +184,11 @@ export function normalizeWarningData(raw: any): WeatherWarning[] {
 }
 
 export function buildRiskSnapshot(input: RiskSnapshotInput): RiskSnapshot {
-  const warningsByCounty = groupBy(input.warnings, (warning) => warning.countyName);
+  const countyNames = new Set(COUNTIES.map((county) => county.countyName));
+  const activeWarnings = input.warnings.filter(
+    (warning) => countyNames.has(warning.countyName) && isWarningEffectiveAt(warning, input.generatedAt),
+  );
+  const warningsByCounty = groupBy(activeWarnings, (warning) => warning.countyName);
   const rainByCounty = groupBy(input.rainfallStations, (station) => station.countyName);
   const weatherByCounty = groupBy(input.weatherStations, (station) => station.countyName);
   const earthquakeRecent = isRecent(input.earthquake?.occurredAt, input.generatedAt, 24);
@@ -204,104 +198,20 @@ export function buildRiskSnapshot(input: RiskSnapshotInput): RiskSnapshot {
     const warnings = warningsByCounty.get(county.countyName) ?? [];
     const rainfall = rainByCounty.get(county.countyName) ?? [];
     const weather = weatherByCounty.get(county.countyName) ?? [];
-    const earthquakeIntensity = input.earthquake?.countyIntensities.find(
-      (intensity) => intensity.countyName === county.countyName,
-    )?.maxIntensity;
-
-    const reasons: string[] = [];
-    let score = 0;
-
-    for (const warning of warnings) {
-      const weight = warningWeight(warning.phenomena);
-      score += weight;
-      reasons.push(formatWarningReason(warning));
-    }
 
     const maxPast1h = maxNumber(rainfall.map((station) => station.past1h));
     const maxPast3h = maxNumber(rainfall.map((station) => station.past3h));
     const maxPast24h = maxNumber(rainfall.map((station) => station.past24h));
 
-    if (maxPast1h !== undefined) {
-      const rainScore = thresholdScore(maxPast1h, [
-        [40, 55],
-        [20, 30],
-      ]);
-      score += rainScore;
-      if (rainScore > 0) reasons.push(`1小時 ${formatNumber(maxPast1h)} mm 強降雨`);
-    }
-
-    if (maxPast3h !== undefined) {
-      const rainScore = thresholdScore(maxPast3h, [
-        [100, 50],
-        [50, 30],
-      ]);
-      score += rainScore;
-      if (rainScore > 0) reasons.push(`3小時 ${formatNumber(maxPast3h)} mm 累積雨量`);
-    }
-
-    if (maxPast24h !== undefined) {
-      const rainScore = thresholdScore(maxPast24h, [
-        [200, 55],
-        [80, 30],
-      ]);
-      score += rainScore;
-      if (rainScore > 0) reasons.push(`24小時 ${formatNumber(maxPast24h)} mm 累積雨量`);
-    }
-
     const maxWindSpeed = maxNumber(weather.map((station) => station.windSpeed));
     const maxGustSpeed = maxNumber(weather.map((station) => station.gustSpeed));
     const maxTemperature = maxNumber(weather.map((station) => station.temperature));
-
-    if (maxGustSpeed !== undefined || maxWindSpeed !== undefined) {
-      const gust = maxGustSpeed ?? 0;
-      const average = maxWindSpeed ?? 0;
-      const windScore = Math.max(
-        thresholdScore(gust, [
-          [20.8, 45],
-          [17.2, 35],
-          [10.8, 18],
-        ]),
-        thresholdScore(average, [
-          [13.9, 35],
-          [10.8, 22],
-        ]),
-      );
-      score += windScore;
-      if (windScore > 0) reasons.push(`陣風 ${formatNumber(gust || average)} m/s`);
-    }
-
-    if (maxTemperature !== undefined) {
-      const tempScore = thresholdScore(maxTemperature, [
-        [38, 45],
-        [36, 35],
-        [33, 15],
-      ]);
-      score += tempScore;
-      if (tempScore > 0) reasons.push(`高溫 ${formatNumber(maxTemperature)} °C`);
-    }
-
-    if (earthquakeRecent && earthquakeIntensity !== undefined && earthquakeIntensity >= 3) {
-      score += earthquakeIntensity >= 5 ? 35 : 20;
-      reasons.push(`近24小時有感地震 ${earthquakeIntensity}級`);
-    }
-
-    if (typhoonActive && input.typhoon?.distanceKmFromTaiwan !== undefined) {
-      const typhoonScore = thresholdScore(input.typhoon.distanceKmFromTaiwan * -1, [
-        [-400, 28],
-        [-800, 10],
-      ]);
-      score += typhoonScore;
-      if (typhoonScore > 0) reasons.push(`熱帶氣旋${input.typhoon.localName ?? input.typhoon.name ?? ""}需留意`);
-    }
 
     return {
       countyName: county.countyName,
       geocode: county.geocode,
       region: county.region,
-      level: levelFromScore(score),
-      score,
       warnings,
-      reasons,
       metrics: {
         maxPast1h,
         maxPast3h,
@@ -309,25 +219,18 @@ export function buildRiskSnapshot(input: RiskSnapshotInput): RiskSnapshot {
         maxTemperature,
         maxWindSpeed,
         maxGustSpeed,
-        earthquakeIntensity,
       },
     } satisfies CountyRisk;
-  }).sort(compareCountyRisk);
+  }).sort(compareCountyWarnings);
 
-  const nationalScore = counties[0]?.score ?? 0;
-  const nationalLevel = levelFromScore(nationalScore);
-  const activeWarningCountyCount = new Set(input.warnings.map((warning) => warning.countyName)).size;
+  const activeWarningCountyCount = counties.filter((county) => county.warnings.length > 0).length;
 
   return {
     generatedAt: input.generatedAt,
     national: {
-      level: nationalLevel,
-      score: nationalScore,
-      answer: nationalAnswer(nationalLevel, activeWarningCountyCount),
       activeWarningCountyCount,
     },
     counties,
-    attentionToday: buildAttentionItems(counties, input),
     sections: {
       rainfall: {
         maxPast1h: rankRain(input.rainfallStations, "past1h"),
@@ -381,87 +284,32 @@ function groupBy<T>(items: T[], keyFn: (item: T) => string): Map<string, T[]> {
   return groups;
 }
 
-function warningWeight(phenomena: string): number {
-  if (phenomena.includes("超大豪雨")) return 90;
-  if (phenomena.includes("大豪雨")) return 78;
-  if (phenomena.includes("豪雨")) return 60;
-  if (phenomena.includes("大雨")) return 45;
-  if (phenomena.includes("颱風")) return 75;
-  if (phenomena.includes("強風")) return 35;
-  if (phenomena.includes("高溫")) return 35;
-  if (phenomena.includes("低溫")) return 25;
-  if (phenomena.includes("濃霧")) return 20;
-  return 18;
-}
-
-function formatWarningReason(warning: WeatherWarning): string {
-  const area = warning.affectedAreas.length > 0 ? `（${warning.affectedAreas.join("、")}）` : "";
-  return `${warning.phenomena}${warning.significance}${area}`;
-}
-
-function thresholdScore(value: number, thresholds: Array<[number, number]>): number {
-  const matched = thresholds.find(([threshold]) => value >= threshold);
-  return matched?.[1] ?? 0;
-}
-
 function maxNumber(values: Array<number | undefined>): number | undefined {
   const valid = values.filter((value): value is number => typeof value === "number" && Number.isFinite(value));
   return valid.length > 0 ? Math.max(...valid) : undefined;
 }
 
-function levelFromScore(score: number): RiskLevel {
-  if (score >= 75) return "high";
-  if (score >= 45) return "elevated";
-  if (score >= 20) return "watch";
-  return "safe";
-}
-
-function compareCountyRisk(a: CountyRisk, b: CountyRisk): number {
-  if (b.score !== a.score) return b.score - a.score;
+function compareCountyWarnings(a: CountyRisk, b: CountyRisk): number {
+  if (b.warnings.length !== a.warnings.length) return b.warnings.length - a.warnings.length;
   return COUNTIES.findIndex((county) => county.countyName === a.countyName) -
     COUNTIES.findIndex((county) => county.countyName === b.countyName);
 }
 
-function nationalAnswer(level: RiskLevel, activeWarningCountyCount: number): string {
-  if (level === "high") return `台灣目前天氣風險偏高，${activeWarningCountyCount} 個縣市有警特報或強觀測訊號。`;
-  if (level === "elevated") return `台灣目前有局部天氣風險，${activeWarningCountyCount} 個縣市需要留意。`;
-  if (level === "watch") return "台灣目前大致可正常活動，但仍有局部天氣訊號需要觀察。";
-  if (level === "stale") return "資料更新偏舊，請先確認官方最新資訊。";
-  return "台灣目前整體天氣風險偏低。";
-}
+function isWarningEffectiveAt(warning: WeatherWarning, reference: string): boolean {
+  const referenceTime = new Date(reference).getTime();
+  if (!Number.isFinite(referenceTime)) return false;
 
-function buildAttentionItems(counties: CountyRisk[], input: RiskSnapshotInput): string[] {
-  const items: string[] = [];
-  const topCounties = counties.filter((county) => county.score > 0).slice(0, 3);
-  const heavyRainWarning = input.warnings.find((warning) => warning.phenomena.includes("雨"));
-
-  if (heavyRainWarning) {
-    const area = heavyRainWarning.affectedAreas.length > 0 ? heavyRainWarning.affectedAreas.join("、") : "山區與低窪地區";
-    items.push(`${heavyRainWarning.countyName}${area}留意短延時強降雨、溪水暴漲與道路積淹水。`);
+  if (warning.startTime) {
+    const startTime = new Date(warning.startTime).getTime();
+    if (!Number.isFinite(startTime) || startTime > referenceTime) return false;
   }
 
-  const windCounty = counties.find((county) => (county.metrics.maxGustSpeed ?? 0) >= 17.2 || county.warnings.some((warning) => warning.phenomena.includes("強風")));
-  if (windCounty) {
-    items.push(`${windCounty.countyName}沿海與空曠地區留意強陣風，外出固定招牌、盆栽與機車。`);
+  if (warning.endTime) {
+    const endTime = new Date(warning.endTime).getTime();
+    if (!Number.isFinite(endTime) || endTime <= referenceTime) return false;
   }
 
-  if (input.typhoon && isRecent(input.typhoon.latestAt, input.generatedAt, 48)) {
-    items.push(`熱帶氣旋${input.typhoon.localName ?? input.typhoon.name ?? ""}仍在活動，留意 CWA 最新颱風消息與海面風浪。`);
-  }
-
-  if (input.earthquake && isRecent(input.earthquake.occurredAt, input.generatedAt, 24)) {
-    items.push("近24小時有感地震後，山區道路與邊坡請留意落石及餘震資訊。");
-  }
-
-  if (items.length === 0 && topCounties.length > 0) {
-    items.push(`${topCounties.map((county) => county.countyName).join("、")}有局部天氣訊號，出門前確認官方警特報。`);
-  }
-
-  if (items.length === 0) {
-    items.push("目前未見明顯警特報，仍建議出門前確認目的地天氣與交通狀況。");
-  }
-
-  return items;
+  return true;
 }
 
 function isRecent(value: string | undefined, reference: string, hours: number): boolean {
@@ -517,8 +365,4 @@ function rankTemperature(
     observedAt: station.observedAt,
     value: station[field],
   };
-}
-
-function formatNumber(value: number): string {
-  return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }

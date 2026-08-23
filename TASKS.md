@@ -1,61 +1,48 @@
 # Tasks
 
-## Current Status
+Status date: 2026-08-10 (Asia/Taipei)
 
-Portfolio-ready first build completed on 2026-05-30. Dev server is running at `http://127.0.0.1:5174/`.
+The original portfolio-first build is superseded by the public-product mission in [`PRODUCT_STRATEGY.md`](./PRODUCT_STRATEGY.md). Historical work remains in git history and [`REVIEW_LOG.md`](./REVIEW_LOG.md).
 
-## Phase 1: Project Foundation
+## Iteration 1 — Warning Truth and Destination Utility
 
-- [x] Confirm target folder state.
-- [x] Inspect reference dashboard design language.
-- [x] Research official CWA datasets and no-key delivery path.
-- [x] Initialize Git repository.
-- [x] Create required tracking docs.
-- [x] Add Vite/React/TypeScript/Tailwind package and config files.
-- [x] Add first risk-engine tests before production implementation.
-- [x] Install dependencies.
-- [x] Run test command and verify the initial risk-engine tests fail for the expected missing module.
-- [x] Implement first risk-engine slice and make tests pass.
+- [x] Re-audit repository, current deployment, git history, tests, data path, UX, and maintenance constraints.
+- [x] Research current CWA/NCDR semantics, competing products, licensing, and GitHub scheduling limits.
+- [x] Replace the nationwide “safe or risky” mission with a destination-first official-warning task.
+- [x] Preserve warning affected areas and exclude expired/not-yet-effective warnings.
+- [x] Add per-source live/cache/none provenance and a bounded 90-minute cache budget.
+- [x] Fail closed when current warning coverage cannot be confirmed.
+- [x] Remove earthquake reports and regional cyclone tracks from current weather scoring.
+- [x] Put county selection, warning state, source time, action, and official link in the first viewport.
+- [x] Persist selected county in the URL.
+- [x] Separate official warnings, observations, and recent context records in the UI.
+- [x] Complete App regression tests for loading/current/cached/unavailable and county deep links.
+- [x] Complete production browser verification for desktop/mobile and failure states.
+- [x] Complete independent review and post-implementation Mission review.
 
-## Phase 2: Data Pipeline
+## Iteration 2 — Reliable Static Delivery
 
-- [x] Add tests for parser edge cases and degraded source handling.
-- [x] Define CWA endpoint metadata and source labels.
-- [x] Implement warning parser for `W-C0033-001`.
-- [x] Implement rainfall parser for `O-A0002-001`.
-- [x] Implement weather station parser for `O-A0001-001`.
-- [x] Implement earthquake parser for `E-A0015-005`.
-- [x] Implement typhoon parser for `W-C0034-005`.
-- [x] Implement timeout-aware fetcher and cache fallback.
+- [x] Require a complete 22-county warning schema before replacing the deployed cache.
+- [x] Preserve the last known good artifact when warning refresh is incomplete or invalid.
+- [x] Compact the fallback to the complete warning feed only, enforce a 64 KiB raw budget, and stop shipping full observation feeds.
+- [x] Add lint and artifact validation to CI.
+- [x] Move the scheduled job away from minute `0`; document that scheduling remains best effort.
+- [ ] Add an external freshness probe and a named recovery/rollback runbook.
+- [ ] Consolidate duplicated browser/generator warning validators into one shared contract.
+- [x] Add per-request timeout/one retry to cache generation and a 15-minute workflow job timeout.
+- [x] Remove the unused legacy score/`safe`/national-answer model so it cannot regress into the UI.
+- [x] Start cache and live requests concurrently without allowing a late cache result to replace live truth.
 
-## Phase 3: Risk Model
+## Iteration 3 — Validate Real User Value
 
-- [x] Define county list, regions, and display order.
-- [x] Implement warning/rain/wind/temperature/earthquake/typhoon scoring.
-- [x] Generate Taiwan-wide status answer.
-- [x] Generate county ranking and daily attention guidance.
-- [x] Add tests for warning shape, high-risk scoring, parser edge cases, and partial/fatal data scenarios.
+- [ ] Test the destination-warning task with 8–12 unfamiliar Taiwan users.
+- [ ] Compare task accuracy/time against opening CWA/NCDR directly.
+- [ ] Measure authority/source comprehension, official-link use, share intent, and return intent.
+- [ ] Stop, narrow, or reposition the product if it does not materially improve the task.
 
-## Phase 4: Dashboard UI
+## Launch Hardening
 
-- [x] Implement app shell and data-loading state machine.
-- [x] Implement first-viewport risk overview.
-- [x] Implement county/city risk cards and region filters.
-- [x] Implement active warning detail cards.
-- [x] Implement rainfall, wind, temperature, earthquake, and typhoon sections.
-- [x] Implement error, empty, stale, and partial-data banners.
-- [x] Implement responsive mobile layout and accessibility polish.
-
-## Phase 5: Docs and Verification
-
-- [x] Add GitHub Actions data-cache workflow.
-- [x] Finish README with data sources, setup, deployment, and limitations.
-- [x] Run `npm run lint`.
-- [x] Run `npm run test`.
-- [x] Run `npm run build`.
-- [x] Run `npm run fetch:data`.
-- [x] Run local dev server.
-- [x] Inspect UI in browser desktop viewport.
-- [x] Inspect UI in browser mobile viewport.
-- [x] Verify failure states.
-- [x] Update `REVIEW_LOG.md` with final self-review.
+- [ ] Complete keyboard/screen-reader/high-zoom accessibility testing.
+- [ ] Add a real Open Graph image, canonical policy, sitemap, and configurable root-domain base.
+- [ ] Choose a production domain and verify DNS/HTTPS/rollback only with valid account access.
+- [ ] Document privacy, incident response, data retention, dependency maintenance, and ownership.
