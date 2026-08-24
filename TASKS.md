@@ -27,7 +27,7 @@ The original portfolio-first build is superseded by the public-product mission i
 - [x] Compact the fallback to the complete warning feed only, enforce a 64 KiB raw budget, and stop shipping full observation feeds.
 - [x] Add lint and artifact validation to CI.
 - [x] Move the scheduled job away from minute `0`; document that scheduling remains best effort.
-- [ ] Add an external freshness probe and a named recovery/rollback runbook.
+- [x] Add an external freshness probe and a named recovery/rollback runbook.
 - [ ] Consolidate duplicated browser/generator warning validators into one shared contract.
 - [x] Add per-request timeout/one retry to cache generation and a 15-minute workflow job timeout.
 - [x] Remove the unused legacy score/`safe`/national-answer model so it cannot regress into the UI.

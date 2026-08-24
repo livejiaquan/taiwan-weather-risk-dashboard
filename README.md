@@ -81,6 +81,8 @@ Warning cache 只有在完整覆蓋 22 縣市、縣市名稱與代碼一致，�
 
 GitHub Actions 排程只作 best-effort fallback：排程可能延遲或漏跑，因此不是警示更新 SLA，也不應是長期正式部署的唯一 ingestion path。Build／deploy job 分別設 15／10 分鐘上限，避免上游或 runner 無界等待。
 
+獨立的 `freshness.yml` 會錯開部署排程，從公開 Pages URL 重新下載 artifact；它會檢查 HTTP/JSON、90 分鐘時效、未來時間、warning source 狀態與完整 22 縣市 schema。可在本機執行 `npm run probe:freshness`；失敗診斷、重跑與 rollback 步驟見 [`docs/RECOVERY.md`](./docs/RECOVERY.md)。
+
 ## 部署
 
 目前 workflow 可在 `main` 更新或手動觸發時測試、建立 cache、build 並部署 GitHub Pages。正式網域上線前仍需完成：

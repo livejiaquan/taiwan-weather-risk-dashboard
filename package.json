@@ -10,7 +10,8 @@
     "lint": "eslint .",
     "test": "vitest run --config vitest.config.ts",
     "test:watch": "vitest --config vitest.config.ts",
-    "fetch:data": "tsx scripts/fetch-cwa-data.ts"
+    "fetch:data": "tsx scripts/fetch-cwa-data.ts",
+    "probe:freshness": "tsx scripts/check-deployment-freshness.ts"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",
