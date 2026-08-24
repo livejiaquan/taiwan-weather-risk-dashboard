@@ -122,6 +122,36 @@ describe("deployment freshness probe", () => {
     expect(() => checkDeploymentFreshness(incomplete, now)).toThrow(/cover exactly 22 counties/);
   });
 
+  it("retries one transient server error before failing the probe", async () => {
+    const generatedAt = new Date().toISOString();
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: false, status: 503 })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => cacheDocument(generatedAt),
+      }) as unknown as typeof fetch;
+
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    try {
+      await expect(main("https://example.test/latest.json", fetchImpl)).resolves.toMatchObject({
+        generatedAt: new Date(generatedAt).toISOString(),
+      });
+      expect(fetchImpl).toHaveBeenCalledTimes(2);
+    } finally {
+      logSpy.mockRestore();
+    }
+  });
+
+  it("stops after one transient server-error retry", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({ ok: false, status: 503 }) as unknown as typeof fetch;
+
+    await expect(main("https://example.test/latest.json", fetchImpl)).rejects.toThrow(
+      /HTTP 503/,
+    );
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
   it("keeps the request timeout active while parsing the response body", async () => {
     let bodyParsingStarted!: () => void;
     const bodyParsing = new Promise<void>((resolve) => {

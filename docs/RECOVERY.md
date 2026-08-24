@@ -1,6 +1,6 @@
 # Freshness incident recovery
 
-This runbook covers failures from the independent **Check deployment freshness** workflow. The probe requests the deployed `data/latest.json` with a cache-busting query, rejects HTTP/JSON errors, requires a successful warning source, reuses the 22-county warning-schema validator, and fails when `generatedAt` is older than 90 minutes or more than 5 minutes in the future.
+This runbook covers failures from the independent **Check deployment freshness** workflow. The probe requests the deployed `data/latest.json` with a cache-busting query, retries one transient HTTP 5xx response, rejects persistent HTTP/JSON errors, requires a successful warning source, reuses the 22-county warning-schema validator, and fails when `generatedAt` is older than 90 minutes or more than 5 minutes in the future.
 
 ## 1. Confirm the incident
 

@@ -8,6 +8,13 @@ const DEFAULT_DEPLOYMENT_URL =
 const MAX_AGE_MS = 90 * 60 * 1000;
 const MAX_FUTURE_SKEW_MS = 5 * 60 * 1000;
 const REQUEST_TIMEOUT_MS = 10_000;
+const RETRY_DELAY_MS = 250;
+
+class HttpStatusError extends Error {
+  constructor(readonly status: number) {
+    super(`deployment probe received HTTP ${status}`);
+  }
+}
 
 interface FreshnessResult {
   ageMinutes: number;
@@ -61,19 +68,33 @@ export async function main(
   const target = new URL(url);
   target.searchParams.set("probe", Date.now().toString());
 
+  let document: unknown;
+  try {
+    document = await fetchDeploymentDocument(target, fetchImpl);
+  } catch (error) {
+    if (!(error instanceof HttpStatusError) || error.status < 500 || error.status >= 600) {
+      throw error;
+    }
+    await new Promise((resolvePromise) => globalThis.setTimeout(resolvePromise, RETRY_DELAY_MS));
+    document = await fetchDeploymentDocument(target, fetchImpl);
+  }
+
+  const result = checkDeploymentFreshness(document);
+  console.log(
+    `Deployment cache healthy: generated ${result.generatedAt}, age ${result.ageMinutes.toFixed(1)} minutes`,
+  );
+  return result;
+}
+
+async function fetchDeploymentDocument(target: URL, fetchImpl: typeof fetch): Promise<unknown> {
   const controller = new globalThis.AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
     const response = await fetchImpl(target, { signal: controller.signal });
     if (!response.ok) {
-      throw new Error(`deployment probe received HTTP ${response.status}`);
+      throw new HttpStatusError(response.status);
     }
-
-    const result = checkDeploymentFreshness(await response.json());
-    console.log(
-      `Deployment cache healthy: generated ${result.generatedAt}, age ${result.ageMinutes.toFixed(1)} minutes`,
-    );
-    return result;
+    return await response.json();
   } finally {
     clearTimeout(timeout);
   }
