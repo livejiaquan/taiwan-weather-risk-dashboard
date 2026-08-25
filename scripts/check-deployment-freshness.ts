@@ -1,7 +1,7 @@
 import { resolve } from "node:path";
 import { clearTimeout, setTimeout } from "node:timers";
 import { pathToFileURL, URL } from "node:url";
-import { validateWarningPayload } from "./fetch-cwa-data";
+import { validateWarningPayload } from "../src/lib/warningPayloadValidator";
 
 const DEFAULT_DEPLOYMENT_URL =
   "https://livejiaquan.github.io/taiwan-weather-risk-dashboard/data/latest.json";

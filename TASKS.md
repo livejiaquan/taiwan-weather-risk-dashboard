@@ -28,7 +28,7 @@ The original portfolio-first build is superseded by the public-product mission i
 - [x] Add lint and artifact validation to CI.
 - [x] Move the scheduled job away from minute `0`; document that scheduling remains best effort.
 - [x] Add an external freshness probe and a named recovery/rollback runbook.
-- [ ] Consolidate duplicated browser/generator warning validators into one shared contract.
+- [x] Consolidate duplicated browser/generator warning validators into one shared contract.
 - [x] Add per-request timeout/one retry to cache generation and a 15-minute workflow job timeout.
 - [x] Remove the unused legacy score/`safe`/national-answer model so it cannot regress into the UI.
 - [x] Start cache and live requests concurrently without allowing a late cache result to replace live truth.

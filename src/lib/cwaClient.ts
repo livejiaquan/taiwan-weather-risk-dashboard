@@ -7,7 +7,8 @@ import {
   type CwaPayloads,
   type CwaSourceKey,
 } from "./cwaAdapter";
-import { buildRiskSnapshot, COUNTIES, type RiskSnapshot } from "./riskEngine";
+import { buildRiskSnapshot, type RiskSnapshot } from "./riskEngine";
+import { hasValidWarningPayload } from "./warningPayloadValidator";
 
 interface DashboardRequestInit extends RequestInit {
   cache?: "no-store";
@@ -81,7 +82,6 @@ interface CacheMergeResult {
 
 const CACHE_MAX_AGE_MS = 90 * 60 * 1000;
 const INVALID_WARNING_PAYLOAD_ERROR = "Invalid warning payload schema";
-const WARNING_GEOCODE_BY_COUNTY = new Map(COUNTIES.map(({ countyName, geocode }) => [countyName, geocode]));
 
 const SOURCE_STALE_HOURS: Record<Exclude<CwaSourceKey, "warnings">, number> = {
   rainfall: 2,
@@ -211,91 +211,6 @@ async function loadSource(
       },
     };
   }
-}
-
-function hasValidWarningPayload(payload: unknown): boolean {
-  if (!isRecord(payload)) return false;
-
-  const cwaOpenData = payload.cwaopendata;
-  if (!isRecord(cwaOpenData)) return false;
-
-  const sent = cwaOpenData.sent;
-  if (typeof sent !== "string" || !Number.isFinite(new Date(sent).getTime())) return false;
-
-  const dataset = cwaOpenData.dataset;
-  if (!isRecord(dataset) || !Object.prototype.hasOwnProperty.call(dataset, "location")) return false;
-
-  const locations = asArray(dataset.location);
-  if (locations.length !== COUNTIES.length || !locations.every(isRecord)) return false;
-
-  const seenCountyNames = new Set<string>();
-  for (const location of locations) {
-    const countyName = location.locationName;
-    const geocode = location.geocode;
-    if (typeof countyName !== "string" || typeof geocode !== "string") return false;
-    if (seenCountyNames.has(countyName) || WARNING_GEOCODE_BY_COUNTY.get(countyName) !== geocode) return false;
-    if (!hasValidWarningLocation(location)) return false;
-    seenCountyNames.add(countyName);
-  }
-
-  return seenCountyNames.size === WARNING_GEOCODE_BY_COUNTY.size;
-}
-
-function hasValidWarningLocation(location: Record<string, unknown>): boolean {
-  if (!hasOwn(location, "hazardConditions")) return false;
-
-  const hazardConditions = location.hazardConditions;
-  if (hazardConditions === null) return true;
-  if (!isRecord(hazardConditions) || !hasOwn(hazardConditions, "hazards")) return false;
-
-  const hazards = asArray(hazardConditions.hazards);
-  return hazards.length > 0 && hazards.every(hasValidWarningHazard);
-}
-
-function hasValidWarningHazard(value: unknown): boolean {
-  if (!isRecord(value) || !isRecord(value.info) || !isRecord(value.validTime)) return false;
-  if (!isNonEmptyString(value.info.phenomena) || !isNonEmptyString(value.info.significance)) return false;
-
-  const startTime = value.validTime.startTime;
-  const endTime = value.validTime.endTime;
-  if (!isParseableDateString(startTime) || !isParseableDateString(endTime)) return false;
-  if (new Date(startTime).getTime() >= new Date(endTime).getTime()) return false;
-
-  if (!hasOwn(value, "hazard")) return true;
-  const details = asArray(value.hazard);
-  return details.length > 0 && details.every(hasValidWarningHazardDetail);
-}
-
-function hasValidWarningHazardDetail(value: unknown): boolean {
-  if (!isRecord(value) || !isRecord(value.info)) return false;
-  if (!hasOwn(value.info, "affectedAreas")) return true;
-
-  const affectedAreas = value.info.affectedAreas;
-  if (!isRecord(affectedAreas) || !hasOwn(affectedAreas, "location")) return false;
-
-  const affectedLocations = asArray(affectedAreas.location);
-  return (
-    affectedLocations.length > 0 &&
-    affectedLocations.every(
-      (location) => isRecord(location) && isNonEmptyString(location.locationName),
-    )
-  );
-}
-
-function hasOwn(value: Record<string, unknown>, key: string): boolean {
-  return Object.prototype.hasOwnProperty.call(value, key);
-}
-
-function isNonEmptyString(value: unknown): value is string {
-  return typeof value === "string" && value.trim().length > 0;
-}
-
-function isParseableDateString(value: unknown): value is string {
-  return isNonEmptyString(value) && Number.isFinite(new Date(value).getTime());
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function hasUsableRainfallObservation(payload: unknown): boolean {
