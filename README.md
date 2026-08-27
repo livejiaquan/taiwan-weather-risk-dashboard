@@ -48,7 +48,7 @@
 
 ## 本機開發
 
-需求：Node.js 20 以上與 npm。
+需求：Node.js 20、22 或 24 以上版本（符合 Vitest 支援範圍）與 npm。
 
 ```bash
 npm install
