@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: read
+  actions: write
 
 jobs:
   probe:
@@ -27,4 +28,18 @@ jobs:
         run: npm ci
 
       - name: Probe deployed warning cache
+        id: freshness-probe
+        continue-on-error: true
         run: npm run probe:freshness
+
+      - name: Request a recovery deployment
+        if: steps.freshness-probe.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run pages.yml --ref main
+
+      - name: Preserve the freshness alert
+        if: steps.freshness-probe.outcome == 'failure'
+        run: |
+          echo "The deployed cache is unhealthy; a recovery deployment was requested." >&2
+          exit 1

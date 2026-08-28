@@ -81,6 +81,13 @@ describe("deployment freshness probe", () => {
     expect(workflow).toMatch(/cron:\s+["']11,41 \* \* \* \*["']/);
     expect(workflow).toContain("npm run probe:freshness");
     expect(workflow).toContain("timeout-minutes: 5");
+    expect(workflow).toMatch(/actions:\s+write/);
+    expect(workflow).toMatch(/id:\s+freshness-probe/);
+    expect(workflow).toMatch(/continue-on-error:\s+true/);
+    expect(workflow).toMatch(/if:\s+steps\.freshness-probe\.outcome == 'failure'/);
+    expect(workflow).toContain("GH_TOKEN: ${{ github.token }}");
+    expect(workflow).toContain("gh workflow run pages.yml --ref main");
+    expect(workflow).toContain("exit 1");
     expect(packageDocument.scripts["probe:freshness"]).toBe(
       "tsx scripts/check-deployment-freshness.ts",
     );

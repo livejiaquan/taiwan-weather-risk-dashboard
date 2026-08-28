@@ -1,6 +1,6 @@
 # Freshness incident recovery
 
-This runbook covers failures from the independent **Check deployment freshness** workflow. The probe requests the deployed `data/latest.json` with a cache-busting query, retries one transient HTTP 5xx response, rejects persistent HTTP/JSON errors, requires a successful warning source, reuses the 22-county warning-schema validator, and fails when `generatedAt` is older than 90 minutes or more than 5 minutes in the future.
+This runbook covers failures from the independent **Check deployment freshness** workflow. The probe requests the deployed `data/latest.json` with a cache-busting query, retries one transient HTTP 5xx response, rejects persistent HTTP/JSON errors, requires a successful warning source, reuses the 22-county warning-schema validator, and fails when `generatedAt` is older than 90 minutes or more than 5 minutes in the future. A failed probe now requests one `pages.yml` recovery run while preserving the failed freshness check as an alert; the recovery still uses the normal validation and last-known-good safeguards.
 
 ## 1. Confirm the incident
 
@@ -10,7 +10,7 @@ gh run view <run-id> --log-failed
 DEPLOYMENT_URL=https://livejiaquan.github.io/taiwan-weather-risk-dashboard/data/latest.json npm run probe:freshness
 ```
 
-Classify the failure before changing code:
+First confirm whether the failed run's **Request a recovery deployment** step started a new `pages.yml` run, then classify the failure before changing code:
 
 - **HTTP/DNS/Pages error**: inspect the latest Pages deployment.
 - **Stale timestamp**: inspect whether scheduled Pages refreshes were delayed or cancelled.
