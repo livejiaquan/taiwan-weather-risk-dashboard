@@ -86,7 +86,12 @@ describe("deployment freshness probe", () => {
     expect(workflow).toMatch(/continue-on-error:\s+true/);
     expect(workflow).toMatch(/if:\s+steps\.freshness-probe\.outcome == 'failure'/);
     expect(workflow).toContain("GH_TOKEN: ${{ github.token }}");
+    expect(workflow).toContain("set -euo pipefail");
+    expect(workflow).toContain("--status in_progress");
+    expect(workflow).toContain("--status queued");
+    expect(workflow).toContain("A Pages deployment is already queued or running");
     expect(workflow).toContain("gh workflow run pages.yml --ref main");
+    expect(workflow).toMatch(/if:\s+always\(\) && steps\.freshness-probe\.outcome == 'failure'/);
     expect(workflow).toContain("exit 1");
     expect(packageDocument.scripts["probe:freshness"]).toBe(
       "tsx scripts/check-deployment-freshness.ts",

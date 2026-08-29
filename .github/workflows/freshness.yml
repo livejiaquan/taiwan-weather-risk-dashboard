@@ -36,10 +36,18 @@ jobs:
         if: steps.freshness-probe.outcome == 'failure'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh workflow run pages.yml --ref main
+        run: |
+          set -euo pipefail
+          in_progress=$(gh run list --workflow pages.yml --status in_progress --limit 1 --json databaseId --jq 'length')
+          queued=$(gh run list --workflow pages.yml --status queued --limit 1 --json databaseId --jq 'length')
+          if [ $((in_progress + queued)) -gt 0 ]; then
+            echo "A Pages deployment is already queued or running; skipping duplicate recovery request."
+          else
+            gh workflow run pages.yml --ref main
+          fi
 
       - name: Preserve the freshness alert
-        if: steps.freshness-probe.outcome == 'failure'
+        if: always() && steps.freshness-probe.outcome == 'failure'
         run: |
-          echo "The deployed cache is unhealthy; a recovery deployment was requested." >&2
+          echo "The deployed cache is unhealthy; recovery was requested or is already in progress." >&2
           exit 1

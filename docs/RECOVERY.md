@@ -1,6 +1,6 @@
 # Freshness incident recovery
 
-This runbook covers failures from the independent **Check deployment freshness** workflow. The probe requests the deployed `data/latest.json` with a cache-busting query, retries one transient HTTP 5xx response, rejects persistent HTTP/JSON errors, requires a successful warning source, reuses the 22-county warning-schema validator, and fails when `generatedAt` is older than 90 minutes or more than 5 minutes in the future. A failed probe now requests one `pages.yml` recovery run while preserving the failed freshness check as an alert; the recovery still uses the normal validation and last-known-good safeguards.
+This runbook covers failures from the independent **Check deployment freshness** workflow. The probe requests the deployed `data/latest.json` with a cache-busting query, retries one transient HTTP 5xx response, rejects persistent HTTP/JSON errors, requires a successful warning source, reuses the 22-county warning-schema validator, and fails when `generatedAt` is older than 90 minutes or more than 5 minutes in the future. A failed probe requests one `pages.yml` recovery run while preserving the failed freshness check as an alert; if a Pages run is already queued or in progress, it reuses that run instead of dispatching a duplicate that could cancel it through the workflow concurrency policy. If GitHub cannot report active runs, the guard fails closed without dispatching an unverified duplicate and the freshness alert is still preserved. Recovery still uses the normal validation and last-known-good safeguards.
 
 ## 1. Confirm the incident
 
@@ -10,7 +10,7 @@ gh run view <run-id> --log-failed
 DEPLOYMENT_URL=https://livejiaquan.github.io/taiwan-weather-risk-dashboard/data/latest.json npm run probe:freshness
 ```
 
-First confirm whether the failed run's **Request a recovery deployment** step started a new `pages.yml` run, then classify the failure before changing code:
+First confirm whether the failed run's **Request a recovery deployment** step started a new `pages.yml` run or detected one already queued/running, then classify the failure before changing code:
 
 - **HTTP/DNS/Pages error**: inspect the latest Pages deployment.
 - **Stale timestamp**: inspect whether scheduled Pages refreshes were delayed or cancelled.
