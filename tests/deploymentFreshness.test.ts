@@ -80,7 +80,7 @@ describe("deployment freshness probe", () => {
 
     expect(workflow).toMatch(/cron:\s+["']11,41 \* \* \* \*["']/);
     expect(workflow).toContain("npm run probe:freshness");
-    expect(workflow).toContain("timeout-minutes: 5");
+    expect(workflow).toContain("timeout-minutes: 8");
     expect(workflow).toMatch(/actions:\s+write/);
     expect(workflow).toMatch(/id:\s+freshness-probe/);
     expect(workflow).toMatch(/continue-on-error:\s+true/);
@@ -91,8 +91,11 @@ describe("deployment freshness probe", () => {
     expect(workflow).toContain("--status queued");
     expect(workflow).toContain("A Pages deployment is already queued or running");
     expect(workflow).toContain("gh workflow run pages.yml --ref main");
-    expect(workflow).toMatch(/if:\s+always\(\) && steps\.freshness-probe\.outcome == 'failure'/);
-    expect(workflow).toContain("exit 1");
+    expect(workflow).toContain("Verify freshness after recovery");
+    expect(workflow).toContain("for attempt in {1..10}");
+    expect(workflow).toContain("sleep 20");
+    expect(workflow).toContain("if npm run probe:freshness; then");
+    expect(workflow).not.toContain("Preserve the freshness alert");
     expect(packageDocument.scripts["probe:freshness"]).toBe(
       "tsx scripts/check-deployment-freshness.ts",
     );
