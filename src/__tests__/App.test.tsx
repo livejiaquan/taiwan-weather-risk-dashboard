@@ -170,6 +170,19 @@ describe("App trust-first warning contract", () => {
     cleanup();
   });
 
+  it("provides a keyboard skip link to the destination warning check", () => {
+    mockedLoadCachedRiskDashboardData.mockReturnValue(new Promise(() => {}));
+    mockedLoadRiskDashboardData.mockReturnValue(new Promise(() => {}));
+
+    render(<App />);
+
+    expect(screen.getByRole("link", { name: "跳到主要內容" })).toHaveAttribute(
+      "href",
+      "#county-focus",
+    );
+    expect(document.getElementById("county-focus")).toHaveAttribute("tabindex", "-1");
+  });
+
   it("keeps the first loading paint neutral until official warning data is confirmed", () => {
     window.history.replaceState(null, "", "/?county=臺北市");
     mockedLoadCachedRiskDashboardData.mockReturnValue(new Promise(() => {}));

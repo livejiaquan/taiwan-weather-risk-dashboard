@@ -147,6 +147,12 @@ export function App() {
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_92%_0%,_rgba(186,230,253,0.5),_transparent_28rem),radial-gradient(circle_at_0%_20%,_rgba(15,118,110,0.08),_transparent_30rem),_#F6F7F2] text-ink">
+      <a
+        href="#county-focus"
+        className="fixed left-4 top-4 z-50 -translate-y-24 rounded-xl bg-cobalt-700 px-4 py-3 font-bold text-white shadow-card transition-transform focus:translate-y-0"
+      >
+        跳到主要內容
+      </a>
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-4 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
         <SiteHeader />
         <Hero
@@ -237,7 +243,7 @@ function Hero({
   const primaryWarning = selectedCounty?.warnings[0];
 
   return (
-    <section id="county-focus" className="overflow-hidden rounded-[20px] border border-line/80 bg-white/85 shadow-soft backdrop-blur">
+    <section id="county-focus" tabIndex={-1} className="overflow-hidden rounded-[20px] border border-line/80 bg-white/85 shadow-soft backdrop-blur">
       <div className="grid gap-6 p-5 sm:p-7 lg:grid-cols-[1.05fr_0.95fr] lg:p-9">
         <div className="flex flex-col justify-between gap-7">
           <div className="space-y-5">
