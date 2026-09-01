@@ -4,6 +4,8 @@
 
 本專案是民間整理介面，不是政府官方服務，也不代表中央氣象署背書。它不會宣稱某地「安全」，緊急狀況請以中央與地方政府公告為準。
 
+**線上版：** [https://livejiaquan.github.io/taiwan-weather-risk-dashboard/](https://livejiaquan.github.io/taiwan-weather-risk-dashboard/)
+
 ## 產品任務
 
 陌生使用者應能在數秒內回答：
@@ -85,10 +87,9 @@ GitHub Actions 排程只作 best-effort fallback：排程可能延遲或漏跑�
 
 ## 部署
 
-目前 workflow 可在 `main` 更新或手動觸發時測試、建立 cache、build 並部署 GitHub Pages。正式網域上線前仍需完成：
+目前 workflow 可在 `main` 更新或手動觸發時測試、建立 cache、build 並部署 GitHub Pages。GitHub Pages 版本已提供 canonical、robots 與 sitemap；正式網域上線前仍需完成：
 
-- 穩定 schema validation、last-known-good artifact 與外部 freshness monitoring；
-- configurable Vite base、canonical、sitemap、social preview asset；
+- 可配合自訂網域的 Vite base 與社群預覽圖片；
 - 已選定網域的 DNS、HTTPS、rollback 與維護責任驗證。
 
 Repository 內目前沒有網域、DNS 或外部監控 credential；不可把 sample/mock 或過期 cache 當 production fallback。

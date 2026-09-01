@@ -43,6 +43,7 @@ The original portfolio-first build is superseded by the public-product mission i
 ## Launch Hardening
 
 - [ ] Complete keyboard/screen-reader/high-zoom accessibility testing.
-- [ ] Add a real Open Graph image, canonical policy, sitemap, and configurable root-domain base.
+- [x] Publish a canonical GitHub Pages URL, robots policy, and sitemap.
+- [ ] Add a real Open Graph image and configurable root-domain base.
 - [ ] Choose a production domain and verify DNS/HTTPS/rollback only with valid account access.
 - [ ] Document privacy, incident response, data retention, dependency maintenance, and ownership.

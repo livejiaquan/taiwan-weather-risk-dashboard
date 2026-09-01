@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://livejiaquan.github.io/taiwan-weather-risk-dashboard/sitemap.xml
