@@ -114,10 +114,10 @@ describe("deployment freshness probe", () => {
     ).toThrow(/older than 90 minutes/);
   });
 
-  it("rejects an implausibly future cache timestamp", () => {
+  it("rejects any future cache timestamp because the browser cannot use it", () => {
     expect(() =>
-      checkDeploymentFreshness(cacheDocument("2026-08-24T12:05:01Z"), now),
-    ).toThrow(/more than 5 minutes in the future/);
+      checkDeploymentFreshness(cacheDocument("2026-08-24T12:00:01Z"), now),
+    ).toThrow(/future/);
   });
 
   it("rejects an invalid or unsuccessful warning source", () => {
