@@ -138,8 +138,7 @@ export async function loadRiskDashboardData(
     }
   }
 
-  const riskInput = createRiskInputFromCwaPayloads(payloads);
-  const snapshot = buildRiskSnapshot(riskInput);
+  const snapshot = buildObservationSnapshot(payloads, now);
 
   return {
     snapshot,
@@ -177,7 +176,7 @@ async function loadSource(
     if (key === "rainfall" && !hasUsableRainfallObservation(payload)) {
       throw new Error("No usable rainfall observations");
     }
-    const updatedAt = updatedAtForSource(key, payload);
+    const updatedAt = updatedAtForSource(key, payload, now);
 
     return {
       key,
@@ -277,7 +276,7 @@ async function loadCacheFallback(
       earthquakePayload: payloadForSource("earthquake", cache.payloads),
       typhoonPayload: payloadForSource("typhoon", cache.payloads),
     };
-    const snapshot = buildRiskSnapshot(createRiskInputFromCwaPayloads(payloads));
+    const snapshot = buildObservationSnapshot(payloads, now);
     const sources = cacheSourcesToStatuses(cache.sources, payloads, cache.generatedAt, now, failedSources);
 
     return {
@@ -351,7 +350,7 @@ function mergeFailedSourcesFromCache(
     if (!cachedKeys.has(result.key)) return result.status;
 
     const cachedPayload = payloadForSource(result.key, cache.payloads);
-    const updatedAt = cachedPayload === null ? undefined : updatedAtForSource(result.key, cachedPayload);
+    const updatedAt = cachedPayload === null ? undefined : updatedAtForSource(result.key, cachedPayload, now);
     return {
       ...result.status,
       provenance: "cache" as const,
@@ -410,7 +409,7 @@ function statusForCachePayload(
 ): SourceStatus {
   const endpoint = CWA_ENDPOINTS[key];
   const payloadAvailable = payload !== null;
-  const updatedAt = payloadAvailable ? updatedAtForSource(key, payload) : undefined;
+  const updatedAt = payloadAvailable ? updatedAtForSource(key, payload, now) : undefined;
   const reportedStatus = liveFailure?.status ?? cachedSource?.status ?? (payloadAvailable ? "success" : "error");
   const status = payloadAvailable ? reportedStatus : "error";
   const error =
@@ -468,7 +467,7 @@ function warningDataStatus(sources: SourceStatus[]): WarningDataStatus {
   return status;
 }
 
-function updatedAtForSource(key: CwaSourceKey, payload: unknown): string | undefined {
+function updatedAtForSource(key: CwaSourceKey, payload: unknown, now: Date): string | undefined {
   const raw = payload as any;
 
   if (key === "warnings") return optionalString(raw?.cwaopendata?.sent);
@@ -479,14 +478,33 @@ function updatedAtForSource(key: CwaSourceKey, payload: unknown): string | undef
       asArray(raw?.cwaopendata?.dataset?.Station)
         .map((station) => optionalString(station?.ObsTime?.DateTime))
         .filter((value): value is string => Boolean(value)),
+      now,
     );
   }
 
   return undefined;
 }
 
-function latestDate(values: string[]): string | undefined {
-  return values.sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0];
+function buildObservationSnapshot(payloads: CwaPayloads, now: Date): RiskSnapshot {
+  const input = createRiskInputFromCwaPayloads(payloads);
+  const isPlausible = (observedAt: string | undefined) =>
+    !observedAt || (Number.isFinite(Date.parse(observedAt)) &&
+      Date.parse(observedAt) <= now.getTime() + MAX_FUTURE_SKEW_MINUTES * 60 * 1000);
+  return buildRiskSnapshot({
+    ...input,
+    rainfallStations: input.rainfallStations.filter((station) => isPlausible(station.observedAt)),
+    weatherStations: input.weatherStations.filter((station) => isPlausible(station.observedAt)),
+  });
+}
+
+function latestDate(values: string[], now: Date): string | undefined {
+  const latestAllowed = now.getTime() + MAX_FUTURE_SKEW_MINUTES * 60 * 1000;
+  return values
+    .filter((value) => {
+      const timestamp = Date.parse(value);
+      return Number.isFinite(timestamp) && timestamp <= latestAllowed;
+    })
+    .sort((a, b) => Date.parse(b) - Date.parse(a))[0];
 }
 
 function isStale(value: string | undefined, now: Date, staleHours: number): boolean {

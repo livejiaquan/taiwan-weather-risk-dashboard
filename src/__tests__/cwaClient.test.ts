@@ -316,6 +316,35 @@ describe("loadRiskDashboardData", () => {
     expect(implausiblyFuture.degraded).toBe(true);
   });
 
+  it("does not let one future-dated station mask a fresh observation source", async () => {
+    const result = await loadRiskDashboardData({
+      fetcher: async (url) => {
+        const payload = validPayloadFor(url);
+        if (url.includes("O-A0002-001")) {
+          const rainfall = payload as {
+            cwaopendata: { dataset: { Station: Array<Record<string, unknown>> } };
+          };
+          rainfall.cwaopendata.dataset.Station.push({
+            StationName: "時鐘異常站",
+            GeoInfo: { CountyName: "臺北市" },
+            ObsTime: { DateTime: "2026-05-30T02:00:00+08:00" },
+            RainfallElement: { Past1hr: { Precipitation: 100 } },
+          });
+        }
+        return new Response(JSON.stringify(payload));
+      },
+      now: () => new Date("2026-05-30T00:30:00+08:00"),
+      cacheUrl: null,
+    });
+
+    expect(result.sources.find((source) => source.key === "rainfall")).toMatchObject({
+      status: "success",
+      updatedAt: "2026-05-30T00:20:00+08:00",
+      stale: false,
+    });
+    expect(result.snapshot?.sections.rainfall.maxPast1h?.value).toBe(0);
+  });
+
   it("retries a transient live-source failure before falling back to cache", async () => {
     const attempts = new Map<string, number>();
 
