@@ -40,6 +40,26 @@ describe("CWA observation adapters", () => {
     ]);
   });
 
+  it("does not turn malformed rainfall text into a measurement", () => {
+    const stations = normalizeRainfallData({
+      cwaopendata: {
+        dataset: {
+          Station: [{
+            StationName: "秀林",
+            GeoInfo: { CountyName: "花蓮縣" },
+            RainfallElement: {
+              Past1hr: { Precipitation: "42mm" },
+              Past3hr: { Precipitation: "0" },
+              Past24hr: { Precipitation: "1e2" },
+            },
+          }],
+        },
+      },
+    });
+
+    expect(stations[0]).toMatchObject({ past1h: undefined, past3h: 0, past24h: 100 });
+  });
+
   it("normalizes temperature, wind speed, and gust speed from weather stations", () => {
     const stations = normalizeWeatherStationData({
       cwaopendata: {

@@ -163,7 +163,8 @@ function parseCwaNumber(value: unknown): number | undefined {
   if (!normalized || normalized === "X" || normalized === "-99" || normalized === "-98") return undefined;
   if (normalized.toUpperCase() === "T") return 0;
 
-  const parsed = Number.parseFloat(normalized);
+  if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(normalized)) return undefined;
+  const parsed = Number(normalized);
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
