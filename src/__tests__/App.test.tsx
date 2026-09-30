@@ -162,12 +162,15 @@ function deferred<T>() {
 
 describe("App trust-first warning contract", () => {
   beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(GENERATED_AT));
     vi.clearAllMocks();
     window.history.replaceState(null, "", "/");
   });
 
   afterEach(() => {
     cleanup();
+    vi.useRealTimers();
   });
 
   it("provides a keyboard skip link to the destination warning check", () => {
@@ -407,11 +410,73 @@ describe("App trust-first warning contract", () => {
     const warningContent = within(warningSection);
 
     expect(warningContent.getByText("影響範圍：山區、低窪地區")).toBeInTheDocument();
-    expect(warningContent.getByText(/開始.*2026.*05.*30.*00:00.*結束.*2026.*05.*30.*02:00/)).toBeInTheDocument();
+    const validityStart = warningSection.querySelector('time[datetime="2026-05-30T00:00:00+08:00"]');
+    expect(validityStart).toHaveTextContent("2026/05/30 00:00");
+    expect(validityStart?.parentElement).toHaveTextContent(/開始.*00:00.*結束.*02:00.*臺灣 UTC\+8/);
     expect(warningContent.getByText("本站整理：")).toBeInTheDocument();
     expect(warningContent.getByRole("link", { name: /官方詳情/ })).toHaveAttribute(
       "href",
       "https://www.cwa.gov.tw/V8/C/P/Warning/W26.html",
     );
   });
+  it("shows an upcoming official window separately and follows its exact start and expiry without a reload", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(GENERATED_AT));
+    window.history.replaceState(null, "", "/?county=臺北市");
+    const upcoming: WeatherWarning = {
+      countyName: "臺北市", geocode: "63", phenomena: "豪雨", significance: "特報",
+      startTime: "2026-05-29T16:31:00Z", endTime: "2026-05-29T16:32:00Z", affectedAreas: ["山區"],
+    };
+    arrangeResult(makeCurrentResult([upcoming]));
+    const view = render(<App />);
+    await act(async () => {});
+    expect(screen.getByRole("heading", { name: "臺北市 未列有效縣市警特報" })).toBeInTheDocument();
+    const upcomingSection = screen.getByRole("region", { name: "臺北市 已發布、尚未生效的警特報" });
+    expect(within(upcomingSection).getByText(/目前尚未生效，不列入上方有效警特報數/)).toBeInTheDocument();
+    expect(upcomingSection.querySelector('time[datetime="2026-05-29T16:31:00Z"]')).toHaveTextContent("2026/05/30 00:31");
+    expect(within(upcomingSection).getByRole("link", { name: /官方詳情/ })).toHaveAttribute("href", "https://www.cwa.gov.tw/V8/C/P/Warning/W26.html");
+    await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
+    expect(screen.getByRole("heading", { name: "臺北市 有 1 項警特報" })).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: /已發布、尚未生效的警特報/ })).not.toBeInTheDocument();
+    await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
+    expect(screen.getByRole("heading", { name: "臺北市 未列有效縣市警特報" })).toBeInTheDocument();
+    expect(screen.queryByText("豪雨特報")).not.toBeInTheDocument();
+    expect(mockedLoadRiskDashboardData).toHaveBeenCalledOnce();
+    view.unmount();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("withdraws a no-warning claim when its confirmation ages out and restores it only after a real refresh", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(GENERATED_AT));
+    window.history.replaceState(null, "", "/?county=臺北市");
+    arrangeResult(makeCurrentResult());
+    render(<App />);
+    await act(async () => {});
+    await act(async () => { await vi.advanceTimersByTimeAsync(90 * 60_000 + 1); });
+    expect(screen.getByRole("heading", { name: "無法確認 臺北市 現況" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "臺北市 未列有效縣市警特報" })).not.toBeInTheDocument();
+    const fresh = makeCurrentResult();
+    fresh.warnings.fetchedAt = new Date().toISOString();
+    mockedLoadRiskDashboardData.mockResolvedValue(fresh);
+    await act(async () => { fireEvent.click(screen.getAllByRole("button", { name: "更新資料" })[0]); });
+    expect(screen.getByRole("heading", { name: "臺北市 未列有效縣市警特報" })).toBeInTheDocument();
+  });
+
+  it("rechecks a sleeping tab on focus and hides old warning advice when status is unconfirmed", async () => {
+    window.history.replaceState(null, "", "/?county=臺北市");
+    const warning: WeatherWarning = {
+      countyName: "臺北市", geocode: "63", phenomena: "豪雨", significance: "特報",
+      startTime: "2026-05-30T00:00:00+08:00", endTime: "2026-05-30T08:00:00+08:00", affectedAreas: ["山區"],
+    };
+    arrangeResult(makeCurrentResult([warning]));
+    render(<App />);
+    expect(await screen.findByRole("heading", { name: "臺北市 有 1 項警特報" })).toBeInTheDocument();
+    vi.setSystemTime(new Date("2026-05-30T02:01:00+08:00"));
+    fireEvent(window, new window.Event("focus"));
+    expect(screen.getByRole("heading", { name: "無法確認 臺北市 現況" })).toBeInTheDocument();
+    expect(screen.queryByText("本站整理的下一步：")).not.toBeInTheDocument();
+    expect(screen.queryByText("豪雨特報")).not.toBeInTheDocument();
+  });
+
 });

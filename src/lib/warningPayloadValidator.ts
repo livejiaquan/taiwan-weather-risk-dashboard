@@ -1,4 +1,5 @@
 import { COUNTIES } from "./riskEngine";
+import { warningTimeMs } from "./warningTime";
 
 /**
  * Enforce the warning-feed contract used by both the browser and the cache
@@ -183,5 +184,5 @@ function isNonEmptyString(value: unknown): value is string {
 }
 
 function isParseableDate(value: unknown): value is string {
-  return isNonEmptyString(value) && Number.isFinite(Date.parse(value));
+  return isNonEmptyString(value) && Number.isFinite(warningTimeMs(value));
 }

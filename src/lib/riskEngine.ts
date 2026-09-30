@@ -1,3 +1,5 @@
+import { warningTimeMs } from "./warningTime";
+
 export interface CountyDefinition {
   countyName: string;
   geocode: string;
@@ -65,6 +67,7 @@ export interface CountyRisk {
   geocode: string;
   region: CountyDefinition["region"];
   warnings: WeatherWarning[];
+  upcomingWarnings: WeatherWarning[];
   metrics: {
     maxPast1h?: number;
     maxPast3h?: number;
@@ -77,6 +80,8 @@ export interface CountyRisk {
 
 export interface RiskSnapshot {
   generatedAt: string;
+  /** Original official windows, retained so an open page can follow the clock. */
+  warningTimeline: WeatherWarning[];
   national: {
     activeWarningCountyCount: number;
   };
@@ -189,6 +194,7 @@ export function buildRiskSnapshot(input: RiskSnapshotInput): RiskSnapshot {
     (warning) => countyNames.has(warning.countyName) && isWarningEffectiveAt(warning, input.generatedAt),
   );
   const warningsByCounty = groupBy(activeWarnings, (warning) => warning.countyName);
+  const upcomingByCounty = groupBy(input.warnings.filter((warning) => warningPhaseAt(warning, input.generatedAt) === "upcoming"), (warning) => warning.countyName);
   const rainByCounty = groupBy(input.rainfallStations, (station) => station.countyName);
   const weatherByCounty = groupBy(input.weatherStations, (station) => station.countyName);
   const earthquakeRecent = isRecent(input.earthquake?.occurredAt, input.generatedAt, 24);
@@ -212,6 +218,7 @@ export function buildRiskSnapshot(input: RiskSnapshotInput): RiskSnapshot {
       geocode: county.geocode,
       region: county.region,
       warnings,
+      upcomingWarnings: (upcomingByCounty.get(county.countyName) ?? []).sort(compareWarningStarts),
       metrics: {
         maxPast1h,
         maxPast3h,
@@ -227,6 +234,7 @@ export function buildRiskSnapshot(input: RiskSnapshotInput): RiskSnapshot {
 
   return {
     generatedAt: input.generatedAt,
+    warningTimeline: input.warnings.filter((warning) => countyNames.has(warning.countyName)),
     national: {
       activeWarningCountyCount,
     },
@@ -298,21 +306,38 @@ function compareCountyWarnings(a: CountyRisk, b: CountyRisk): number {
     COUNTIES.findIndex((county) => county.countyName === b.countyName);
 }
 
+export function warningPhaseAt(warning: WeatherWarning, reference: string): "current" | "upcoming" | "expired" | "invalid" {
+  const now = warningTimeMs(reference);
+  const start = warningTimeMs(warning.startTime);
+  const end = warningTimeMs(warning.endTime);
+  if (![now, start, end].every(Number.isFinite) || start >= end) return "invalid";
+  if (now >= end) return "expired";
+  return now < start ? "upcoming" : "current";
+}
+
 function isWarningEffectiveAt(warning: WeatherWarning, reference: string): boolean {
-  const referenceTime = new Date(reference).getTime();
-  if (!Number.isFinite(referenceTime)) return false;
+  return warningPhaseAt(warning, reference) === "current";
+}
 
-  if (warning.startTime) {
-    const startTime = new Date(warning.startTime).getTime();
-    if (!Number.isFinite(startTime) || startTime > referenceTime) return false;
-  }
+function compareWarningStarts(a: WeatherWarning, b: WeatherWarning): number {
+  return warningTimeMs(a.startTime) - warningTimeMs(b.startTime);
+}
 
-  if (warning.endTime) {
-    const endTime = new Date(warning.endTime).getTime();
-    if (!Number.isFinite(endTime) || endTime <= referenceTime) return false;
-  }
-
-  return true;
+/** Reclassify official windows without pretending we fetched new observations. */
+export function reevaluateWarningSnapshot(snapshot: RiskSnapshot, reference: string): RiskSnapshot {
+  const counties = snapshot.counties.map((county) => {
+    const timeline = snapshot.warningTimeline.filter((warning) => warning.countyName === county.countyName);
+    return {
+      ...county,
+      warnings: timeline.filter((warning) => warningPhaseAt(warning, reference) === "current"),
+      upcomingWarnings: timeline.filter((warning) => warningPhaseAt(warning, reference) === "upcoming").sort(compareWarningStarts),
+    };
+  }).sort(compareCountyWarnings);
+  return {
+    ...snapshot,
+    counties,
+    national: { activeWarningCountyCount: counties.filter((county) => county.warnings.length > 0).length },
+  };
 }
 
 function isRecent(value: string | undefined, reference: string, hours: number): boolean {

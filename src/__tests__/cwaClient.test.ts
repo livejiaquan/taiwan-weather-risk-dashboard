@@ -91,6 +91,28 @@ describe("warning payload parser contract", () => {
 });
 
 describe("loadRiskDashboardData", () => {
+  it("does not confirm a warning feed with an implausibly future publication timestamp", async () => {
+    const result = await loadRiskDashboardData({
+      fetcher: async (url) => new Response(JSON.stringify(url.includes("W-C0033-001")
+        ? completeWarningPayload("2026-05-30T00:36:00+08:00") : validPayloadFor(url))),
+      now: () => new Date("2026-05-30T00:30:00+08:00"), cacheUrl: null,
+    });
+    expect(result.warnings.currentness).toBe("stale");
+    expect(result.degraded).toBe(true);
+  });
+
+  it("rejects timezone-ambiguous warning windows instead of interpreting the visitor's local timezone", async () => {
+    const result = await loadRiskDashboardData({
+      fetcher: async (url) => new Response(JSON.stringify(url.includes("W-C0033-001")
+        ? completeWarningPayload("2026-05-30T00:00:00+08:00", {
+          臺北市: heavyRainHazard("2026-05-30T00:00:00", "2026-05-30T01:00:00"),
+        }) : validPayloadFor(url))),
+      now: () => new Date("2026-05-30T00:30:00+08:00"), cacheUrl: null,
+    });
+    expect(result.warnings.coverage).toBe("unavailable");
+    expect(result.snapshot?.national.activeWarningCountyCount).toBe(0);
+  });
+
   it("can load the static cache directly for a fast first paint", async () => {
     const result = await loadCachedRiskDashboardData({
       fetcher: async () =>

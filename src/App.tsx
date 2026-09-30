@@ -24,6 +24,8 @@ import {
   type SourceStatus,
 } from "./lib/cwaClient";
 import { COUNTIES, type CountyRisk, type RiskSnapshot, type WeatherWarning } from "./lib/riskEngine";
+import { dashboardAtTime } from "./lib/warningClock";
+import { useWarningClock } from "./hooks/useWarningClock";
 
 type LoadState =
   | { status: "loading"; data: RiskDashboardLoadResult | null; error: null }
@@ -121,7 +123,9 @@ export function App() {
     return () => window.removeEventListener("popstate", syncCountyFromUrl);
   }, []);
 
-  const snapshot = state.data?.snapshot ?? null;
+  const now = useWarningClock(state.data);
+  const data = useMemo(() => dashboardAtTime(state.data, now), [state.data, now]);
+  const snapshot = data?.snapshot ?? null;
   const selectedCounty = snapshot?.counties.find((county) => county.countyName === selectedCountyName) ?? null;
   const filteredCounties = useMemo(() => {
     if (!snapshot) return [];
@@ -157,7 +161,8 @@ export function App() {
         <SiteHeader />
         <Hero
           state={state}
-          result={state.data}
+          result={data}
+          evaluatedAt={new Date(now).toISOString()}
           selectedCounty={selectedCounty}
           selectedCountyName={selectedCountyName}
           onSelectCounty={selectCounty}
@@ -167,27 +172,27 @@ export function App() {
         {state.status === "loading" && !snapshot ? (
           <LoadingState />
         ) : state.status === "error" && !snapshot ? (
-          <FatalState error={state.error} sources={state.data?.sources ?? []} onRetry={load} />
+          <FatalState error={state.error} sources={data?.sources ?? []} onRetry={load} />
         ) : snapshot ? (
           <>
-            <StateBanner result={state.data} isRefreshing={state.status === "loading"} />
-            <OverviewStats snapshot={snapshot} result={state.data} />
+            <StateBanner result={data} isRefreshing={state.status === "loading"} />
+            <OverviewStats snapshot={snapshot} result={data} />
             <InterpretationGuide />
             <CountySection
               counties={filteredCounties}
               region={region}
               setRegion={setRegion}
-              warningState={warningViewState(state.data)}
+              warningState={warningViewState(data)}
               selectedCountyName={selectedCountyName}
               onSelectCounty={selectCounty}
             />
             <WarningSection
               warnings={snapshot.counties.flatMap((county) => county.warnings)}
-              warningState={warningViewState(state.data)}
-              warningStatus={state.data?.warnings}
+              warningState={warningViewState(data)}
+              warningStatus={data?.warnings}
             />
             <SignalSections snapshot={snapshot} />
-            <SourceFooter sources={state.data?.sources ?? []} />
+            <SourceFooter sources={data?.sources ?? []} />
           </>
         ) : (
           <EmptyState onRetry={load} />
@@ -203,11 +208,11 @@ function SiteHeader() {
       <a href="#county-focus" className="inline-flex items-center gap-3 rounded-xl focus:outline-none" aria-label="台灣生活資料誌：天氣風險與警特報首頁">
         <span className="grid h-10 w-10 place-items-center rounded-[14px] bg-cobalt-700 text-sm font-black tracking-tight text-white shadow-card" aria-hidden="true">台</span>
         <span>
-          <span className="block text-xs font-bold tracking-[0.12em] text-teal-800">台灣生活資料誌</span>
+          <span className="block text-sm font-bold tracking-[0.12em] text-teal-800">台灣生活資料誌</span>
           <span className="block text-sm font-black tracking-tight text-ink sm:text-base">天氣風險與警特報</span>
         </span>
       </a>
-      <span className="hidden rounded-full border border-sky-100 bg-white/70 px-3 py-1.5 text-xs font-semibold text-slate-600 sm:block">資料優先 · CWA 公開資料</span>
+      <span className="hidden rounded-full border border-sky-100 bg-white/70 px-3 py-1.5 text-sm font-semibold text-slate-600 sm:block">資料優先 · CWA 公開資料</span>
     </header>
   );
 }
@@ -217,6 +222,7 @@ function Hero({
   result,
   selectedCounty,
   selectedCountyName,
+  evaluatedAt,
   onSelectCounty,
   onRefresh,
 }: {
@@ -224,6 +230,7 @@ function Hero({
   result: RiskDashboardLoadResult | null;
   selectedCounty: CountyRisk | null;
   selectedCountyName: string;
+  evaluatedAt: string;
   onSelectCounty: (countyName: string) => void;
   onRefresh: () => void;
 }) {
@@ -240,7 +247,8 @@ function Hero({
           iconClass: "text-sky-700",
         }
       : countyWarningPresentation(selectedCounty, viewState);
-  const primaryWarning = selectedCounty?.warnings[0];
+  const primaryWarning = viewState === "unavailable" ? undefined : selectedCounty?.warnings[0];
+  const upcomingWarnings = viewState === "unavailable" ? [] : selectedCounty?.upcomingWarnings ?? [];
 
   return (
     <section id="county-focus" tabIndex={-1} className="overflow-hidden rounded-[20px] border border-line/80 bg-white/85 shadow-soft backdrop-blur">
@@ -259,7 +267,7 @@ function Hero({
             </div>
 
             <div className="max-w-3xl">
-              <p className="mb-2 hidden text-xs font-bold uppercase tracking-[0.18em] text-cobalt-700 sm:block">Destination-first warning check</p>
+              <p className="mb-2 hidden text-sm font-bold uppercase tracking-[0.18em] text-cobalt-700 sm:block">Destination-first warning check</p>
               <h1 className="text-3xl font-black leading-[1.18] tracking-tight text-ink sm:text-5xl">
                 先看目的地，現在有沒有有效警特報
               </h1>
@@ -288,7 +296,7 @@ function Hero({
                   ))}
                 </select>
               </div>
-              <p className={`mt-2 text-xs leading-5 text-slate-500 ${selectedCounty ? "hidden sm:block" : ""}`}>選擇結果會保留在網址中，方便直接分享同一個目的地。</p>
+              <p className={`mt-2 text-sm leading-5 text-slate-500 ${selectedCounty ? "hidden sm:block" : ""}`}>選擇結果會保留在網址中，方便直接分享同一個目的地。</p>
             </div>
           </div>
 
@@ -302,7 +310,7 @@ function Hero({
               <RefreshCw className={`h-4 w-4 ${state.status === "loading" ? "animate-spin" : ""}`} aria-hidden="true" />
               {state.status === "loading" ? "更新中" : "更新資料"}
             </button>
-            <div className="text-xs leading-5 text-slate-500">
+            <div className="text-sm leading-5 text-slate-500">
               {result?.warnings.sourceUpdatedAt
                 ? `官方發布：${formatDateTime(result.warnings.sourceUpdatedAt)}`
                 : state.status === "loading"
@@ -319,11 +327,11 @@ function Hero({
           </div>
         </div>
 
-        <div className={`rounded-[20px] border p-5 sm:p-6 ${presentation.containerClass}`} aria-live="polite">
+        <div className={`rounded-[20px] border p-5 sm:p-6 ${presentation.containerClass}`}>
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className={`text-sm font-black ${presentation.eyebrowClass}`}>{presentation.eyebrow}</p>
-              <h2 className="mt-2 text-2xl font-black leading-tight text-slate-950 sm:text-3xl">{presentation.title}</h2>
+              <h2 aria-live="polite" className="mt-2 text-2xl font-black leading-tight text-slate-950 sm:text-3xl">{presentation.title}</h2>
             </div>
             <div className="flex shrink-0 items-center gap-2">
               {selectedCounty ? (
@@ -343,10 +351,10 @@ function Hero({
             </div>
           </div>
 
-          <p className={`mt-4 text-sm leading-6 text-slate-700 ${viewState === "current" && primaryWarning ? "hidden sm:block" : ""}`}>{presentation.detail}</p>
+          <p className={`mt-4 text-base leading-7 text-slate-700 ${viewState === "current" && primaryWarning ? "hidden sm:block" : ""}`}>{presentation.detail}</p>
 
           {selectedCounty && result ? (
-            <p className="mt-3 text-xs leading-5 text-slate-500 sm:hidden">
+            <p className="mt-3 text-sm leading-5 text-slate-500 sm:hidden">
               {result.warnings.sourceUpdatedAt ? `官方發布：${formatDateTime(result.warnings.sourceUpdatedAt)}` : "官方發布時間未提供"}
               {result.warnings.coverage === "current" && result.warnings.fetchedAt ? (
                 <><br />本站直接取得：{formatDateTime(result.warnings.fetchedAt)}</>
@@ -358,28 +366,61 @@ function Hero({
             </p>
           ) : null}
 
+          {result ? (
+            <p className="mt-3 text-base leading-7 text-slate-700">
+              判讀時間（臺灣 UTC+8）：<TimeStamp value={evaluatedAt} />
+              <br />資料取得超過 90 分鐘會改為待確認，請再更新資料。
+            </p>
+          ) : null}
+
           {selectedCounty && primaryWarning ? (
             <div className="mt-5 rounded-2xl border border-white/80 bg-white/85 p-4">
               <div className="font-black text-slate-950">
                 {primaryWarning.phenomena}{primaryWarning.significance}
               </div>
-              <p className="mt-2 text-xs font-semibold leading-5 text-slate-500">
-                有效時間：{primaryWarning.startTime ? formatDateTime(primaryWarning.startTime) : "未提供"}
-                {primaryWarning.endTime ? ` – ${formatDateTime(primaryWarning.endTime)}` : " – 以官方公告為準"}
+              <p className="mt-2 text-sm font-semibold leading-5 text-slate-500">
+                有效時間（臺灣 UTC+8）：<TimeStamp value={primaryWarning.startTime} />
+                {" – "}<TimeStamp value={primaryWarning.endTime} />
               </p>
-              <p className="mt-2 text-sm leading-6 text-slate-700">
+              <p className="mt-2 text-base leading-7 text-slate-700">
                 {primaryWarning.affectedAreas.length > 0
                   ? `影響範圍：${primaryWarning.affectedAreas.join("、")}`
                   : `影響縣市：${primaryWarning.countyName}；細部範圍以官方公告為準`}
               </p>
-              <div className="mt-3 rounded-xl bg-slate-50 px-3 py-2 text-sm leading-6 text-slate-700">
+              <div className="mt-3 rounded-xl bg-slate-50 px-3 py-2 text-base leading-7 text-slate-700">
                 <span className="font-black">本站整理的下一步：</span>
                 {actionForWarning(primaryWarning)}
               </div>
               {selectedCounty.warnings.length > 1 ? (
-                <p className="mt-2 text-xs font-semibold text-slate-500">另有 {selectedCounty.warnings.length - 1} 項警特報，請往下查看完整清單。</p>
+                <p className="mt-2 text-sm font-semibold text-slate-500">另有 {selectedCounty.warnings.length - 1} 項警特報，請往下查看完整清單。</p>
               ) : null}
             </div>
+          ) : null}
+
+          {upcomingWarnings.length > 0 ? (
+            <section aria-label={`${selectedCountyName} 已發布、尚未生效的警特報`} className="mt-5 rounded-2xl border border-sky-200 bg-white p-4">
+              <h3 className="text-lg font-black text-slate-950">已發布、尚未生效 · {upcomingWarnings.length} 項</h3>
+              <p className="mt-2 text-base leading-7 text-slate-700">
+                {viewState === "cached" ? "以下來自時效內快取，請先到官方確認。" : "目前尚未生效，不列入上方有效警特報數。"}
+                出發前請確認行程是否落在下列時間與範圍。
+              </p>
+              <ul className="mt-3 space-y-4">
+                {upcomingWarnings.map((warning, index) => (
+                  <li key={`${warning.phenomena}-${warning.startTime}-${index}`} className="border-t border-sky-100 pt-3">
+                    <p className="text-base font-bold text-slate-950">{warning.phenomena}{warning.significance}</p>
+                    <p className="mt-1 text-base leading-7 text-slate-700">
+                      開始 <TimeStamp value={warning.startTime} /> · 結束 <TimeStamp value={warning.endTime} />（臺灣 UTC+8）
+                    </p>
+                    <p className="mt-1 text-base leading-7 text-slate-700">
+                      影響範圍：{warning.affectedAreas.length ? warning.affectedAreas.join("、") : "細部範圍以官方公告為準"}
+                    </p>
+                    <a href={officialWarningUrl(warning)} target="_blank" rel="noreferrer" className="mt-2 inline-flex min-h-11 items-center gap-1 text-base font-bold text-teal-800 underline underline-offset-4">
+                      查看這項警特報官方詳情 <ExternalLink className="h-4 w-4" aria-hidden="true" />
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </section>
           ) : null}
 
           <a
@@ -391,7 +432,7 @@ function Hero({
             到 CWA 官方頁確認
             <ExternalLink className="h-4 w-4" aria-hidden="true" />
           </a>
-          <p className="mt-3 text-xs leading-5 text-slate-500">
+          <p className="mt-3 text-sm leading-5 text-slate-500">
             本站不是政府官方服務；緊急狀況請依中央與地方政府發布資訊行動。
           </p>
         </div>
@@ -423,7 +464,7 @@ function FatalState({ error, sources, onRetry }: { error: string; sources: Sourc
             <AlertTriangle className="h-5 w-5" aria-hidden="true" />
             目前無法確認警特報
           </h2>
-          <p className="mt-2 text-sm leading-6">{error}</p>
+          <p className="mt-2 text-base leading-7">{error}</p>
           <a href={OFFICIAL_WARNING_URL} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-2 font-bold underline underline-offset-4">
             直接查看 CWA 官方警特報
             <ExternalLink className="h-4 w-4" aria-hidden="true" />
@@ -470,7 +511,7 @@ function StateBanner({ result, isRefreshing }: { result: RiskDashboardLoadResult
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
           <div>
             <span className="font-black">警特報狀態待確認。</span>
-            來源無法取得或資料時間偏舊，因此頁面不會顯示「安全」或「無警報」結論。請先查看 CWA 官方頁。
+            來源無法取得、確認時間缺漏或資料已超過 90 分鐘，因此頁面不會顯示「安全」或「無警報」結論。請先查看 CWA 官方頁。
           </div>
         </div>
       </div>
@@ -580,7 +621,7 @@ function OverviewStats({ snapshot, result }: { snapshot: RiskSnapshot; result: R
             </div>
           </div>
           <p className="mt-4 text-sm text-slate-600">{stat.detail}</p>
-          <p className="mt-2 text-xs font-semibold text-slate-400">{stat.source}</p>
+          <p className="mt-2 text-sm font-semibold text-slate-600">{stat.source}</p>
         </div>
       ))}
     </section>
@@ -610,14 +651,14 @@ function InterpretationGuide() {
     <section className="rounded-2xl border border-line/80 bg-white/90 p-5 shadow-card">
       <div className="mb-4">
         <h2 className="text-xl font-black text-slate-950">這頁怎麼判讀</h2>
-        <p className="mt-1 text-sm leading-6 text-slate-500">官方發布、本站整理與背景紀錄分開呈現，避免把不同語義合成看似精準的「安全分數」。</p>
+        <p className="mt-1 text-base leading-7 text-slate-500">官方發布、本站整理與背景紀錄分開呈現，避免把不同語義合成看似精準的「安全分數」。</p>
       </div>
       <div className="grid gap-3 md:grid-cols-3">
         {items.map((item) => (
           <div key={item.title} className="rounded-2xl border border-line/70 bg-[#F6F7F2] p-4">
             <item.icon className="h-5 w-5 text-teal-700" aria-hidden="true" />
             <h3 className="mt-3 font-black text-slate-950">{item.title}</h3>
-            <p className="mt-2 text-sm leading-6 text-slate-600">{item.detail}</p>
+            <p className="mt-2 text-base leading-7 text-slate-600">{item.detail}</p>
           </div>
         ))}
       </div>
@@ -650,7 +691,8 @@ function CountySection({
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h2 className="text-xl font-black text-slate-950">各縣市警特報與觀測</h2>
-          <p className="mt-1 text-sm leading-6 text-slate-500">警特報與觀測分開標示；點縣市可帶回首屏查看行動提示。</p>
+          <p className="mt-1 text-base leading-7 text-slate-500">警特報與觀測分開標示；點縣市可帶回首屏查看行動提示。</p>
+          <p className="mt-1 text-base leading-7 text-slate-600">觀測值保留上次取得的快照；開著頁面不會更新測站數值，請按「更新資料」重新取得。</p>
         </div>
         <div className="flex flex-wrap gap-2" role="group" aria-label="依區域篩選縣市">
           {REGION_OPTIONS.map((option) => (
@@ -697,23 +739,23 @@ function CountyCard({ county, warningState, selected, onSelect }: { county: Coun
           <h3 className="text-lg font-black text-slate-950">{county.countyName}</h3>
           <p className="mt-1 text-sm text-slate-600">{REGION_LABELS[county.region]}</p>
         </div>
-        <span className={`rounded-full border px-2.5 py-1 text-xs font-black ${status.badgeClass}`}>{status.label}</span>
+        <span className={`rounded-full border px-2.5 py-1 text-sm font-black ${status.badgeClass}`}>{status.label}</span>
       </div>
 
       {hasWarning && warningState !== "unavailable" ? (
         <div className="mt-4 space-y-2">
           {county.warnings.slice(0, 2).map((warning) => (
-            <div key={`${warning.phenomena}-${warning.startTime}`} className="rounded-xl bg-white/80 px-3 py-2 text-sm leading-6 text-slate-800">
+            <div key={`${warning.phenomena}-${warning.startTime}`} className="rounded-xl bg-white/80 px-3 py-2 text-base leading-7 text-slate-800">
               <span className="font-black">{warning.phenomena}{warning.significance}</span>
               {warning.affectedAreas.length > 0 ? ` · ${warning.affectedAreas.join("、")}` : ""}
             </div>
           ))}
         </div>
       ) : (
-        <p className="mt-4 text-sm leading-6 text-slate-600">{status.detail}</p>
+        <p className="mt-4 text-base leading-7 text-slate-600">{status.detail}</p>
       )}
 
-      <div className="mt-4 grid grid-cols-3 gap-2 text-center text-xs" aria-label={`${county.countyName}觀測摘要`}>
+      <div className="mt-4 grid grid-cols-3 gap-2 text-center text-sm" aria-label={`${county.countyName}觀測摘要`}>
         <MiniMetric label="1h 雨" value={formatMetric(county.metrics.maxPast1h, "mm")} />
         <MiniMetric label="陣風" value={formatMetric(county.metrics.maxGustSpeed, "m/s")} />
         <MiniMetric label="高溫" value={formatMetric(county.metrics.maxTemperature, "°C")} />
@@ -753,7 +795,7 @@ function WarningSection({
 
   return (
     <Card title={warningState === "cached" ? "快取中的有效警特報" : "官方有效警特報"} icon={AlertTriangle}>
-      <p className="mb-4 text-xs font-semibold text-slate-500">
+      <p className="mb-4 text-sm font-semibold text-slate-500">
         {warningStatus?.sourceUpdatedAt ? `CWA 官方發布：${formatDateTime(warningStatus.sourceUpdatedAt)}` : "CWA 官方發布時間未提供"}
         {warningStatus?.coverage === "current" && warningStatus.fetchedAt ? (
           <><br />本站直接取得：{formatDateTime(warningStatus.fetchedAt)}</>
@@ -767,7 +809,7 @@ function WarningSection({
         warningState === "cached" ? (
           <WarningNotice tone="amber">時效內快取沒有列出有效警特報，但快取空白不能證明目前沒有警報，請到 CWA 官方頁確認。</WarningNotice>
         ) : (
-          <WarningNotice tone="teal">截至上方標示的本站直接取得時間，這份 CWA 縣市警特報資料未列出仍有效的警示。這不是對其他災害或行程安全的保證。</WarningNotice>
+          <WarningNotice tone="teal">依最近取得的 CWA 資料與目前時間，未列出仍有效的縣市警示；已發布但尚未生效的警特報請選擇目的地查看。這不是對其他災害或行程安全的保證。</WarningNotice>
         )
       ) : (
         <div className="grid gap-3 md:grid-cols-2">
@@ -775,18 +817,17 @@ function WarningSection({
             <article key={`${warning.countyName}-${warning.phenomena}-${warning.startTime}`} className="rounded-xl border border-line/70 bg-[#F6F7F2] p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="font-black text-slate-950">{warning.countyName}</div>
-                <div className="rounded-full bg-white px-2.5 py-1 text-xs font-bold text-slate-700">
+                <div className="rounded-full bg-white px-2.5 py-1 text-sm font-bold text-slate-700">
                   {warning.phenomena}{warning.significance}
                 </div>
               </div>
-              <p className="mt-2 text-sm leading-6 text-slate-600">
+              <p className="mt-2 text-base leading-7 text-slate-600">
                 {warning.affectedAreas.length > 0 ? `影響範圍：${warning.affectedAreas.join("、")}` : "細部影響範圍以 CWA 公告為準"}
               </p>
-              <p className="mt-2 text-xs leading-5 text-slate-500">
-                {warning.startTime ? `開始 ${formatDateTime(warning.startTime)}` : "開始時間未提供"}
-                {warning.endTime ? ` · 結束 ${formatDateTime(warning.endTime)}` : ""}
+              <p className="mt-2 text-sm leading-5 text-slate-500">
+                開始 <TimeStamp value={warning.startTime} /> · 結束 <TimeStamp value={warning.endTime} />（臺灣 UTC+8）
               </p>
-              <p className="mt-3 border-t border-slate-200 pt-3 text-sm leading-6 text-slate-700">
+              <p className="mt-3 border-t border-slate-200 pt-3 text-base leading-7 text-slate-700">
                 <span className="font-black">本站整理：</span>{actionForWarning(warning)}
               </p>
               <a href={officialWarningUrl(warning)} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-1 text-sm font-bold text-teal-800 underline underline-offset-4">
@@ -806,7 +847,7 @@ function WarningNotice({ tone, children }: { tone: "red" | "amber" | "teal"; chi
     amber: "border-amber-200 bg-amber-50 text-amber-950",
     teal: "border-teal-200 bg-teal-50 text-teal-950",
   }[tone];
-  return <div className={`rounded-xl border px-4 py-3 text-sm leading-6 ${toneClass}`}>{children}</div>;
+  return <div className={`rounded-xl border px-4 py-3 text-base leading-7 ${toneClass}`}>{children}</div>;
 }
 
 function SignalSections({ snapshot }: { snapshot: RiskSnapshot }) {
@@ -814,7 +855,10 @@ function SignalSections({ snapshot }: { snapshot: RiskSnapshot }) {
   const typhoon = snapshot.sections.typhoon.signal;
 
   return (
-    <section className="grid gap-4 lg:grid-cols-3">
+    <section className="grid gap-4 lg:grid-cols-3" aria-label="上次取得的觀測資料與近期紀錄">
+      <p className="text-base leading-7 text-slate-700 lg:col-span-3">
+        觀測資料為上次取得的快照，並非持續更新。請按「更新資料」重新取得，或查看<a href="#data-sources" className="font-bold text-teal-800 underline underline-offset-4">各來源時間</a>。
+      </p>
       <Card title="雨量觀測脈絡" icon={CloudRain}>
         <SignalLine label="1 小時最大" value={formatRank(snapshot.sections.rainfall.maxPast1h, "mm")} />
         <SignalLine label="3 小時最大" value={formatRank(snapshot.sections.rainfall.maxPast3h, "mm")} />
@@ -844,7 +888,7 @@ function SignalSections({ snapshot }: { snapshot: RiskSnapshot }) {
               : "無資料"
           }
         />
-        <p className="pt-3 text-xs leading-5 text-slate-500">地震報告記錄已發生事件；熱帶氣旋資料涵蓋西北太平洋與南海，兩者都不等於目前對臺警報。</p>
+        <p className="pt-3 text-sm leading-5 text-slate-500">地震報告記錄已發生事件；熱帶氣旋資料涵蓋西北太平洋與南海，兩者都不等於目前對臺警報。</p>
       </Card>
     </section>
   );
@@ -861,7 +905,7 @@ function SignalLine({ label, value }: { label: string; value: string }) {
 
 function SourceFooter({ sources }: { sources: SourceStatus[] }) {
   return (
-    <footer className="rounded-2xl border border-line/80 bg-white/90 p-5 text-sm text-slate-600 shadow-card">
+    <footer id="data-sources" className="rounded-2xl border border-line/80 bg-white/90 p-5 text-sm text-slate-600 shadow-card">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div className="max-w-3xl">
           <h2 className="text-base font-black text-slate-950">資料來源、更新時間與限制</h2>
@@ -881,7 +925,7 @@ function SourceFooter({ sources }: { sources: SourceStatus[] }) {
 
 function SourceList({ sources }: { sources: SourceStatus[] }) {
   return (
-    <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-5">
+    <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
       {sources.map((source) => {
         const status = sourceDisplay(source);
         return (
@@ -889,19 +933,19 @@ function SourceList({ sources }: { sources: SourceStatus[] }) {
             <div className="flex items-start justify-between gap-2">
               <div>
                 <p className="font-bold text-slate-800">{source.label}</p>
-                <p className="mt-0.5 text-xs text-slate-400">{source.id}</p>
+                <p className="mt-0.5 text-sm text-slate-600">{source.id}</p>
               </div>
-              <span className={`rounded-full px-2 py-1 text-[0.68rem] font-black ${status.badgeClass}`}>{status.label}</span>
+              <span className={`rounded-full px-2 py-1 text-sm font-black ${status.badgeClass}`}>{status.label}</span>
             </div>
-            <p className="mt-3 text-xs leading-5 text-slate-500">
+            <p className="mt-3 text-sm leading-5 text-slate-500">
               來源時間：{source.updatedAt ? formatDateTime(source.updatedAt) : "未提供"}
               <br />
               {source.provenance === "cache"
                 ? `快取建立：${source.cacheGeneratedAt ? formatDateTime(source.cacheGeneratedAt) : "未提供"}`
                 : `本站取得：${source.fetchedAt ? formatDateTime(source.fetchedAt) : "未提供"}`}
             </p>
-            {source.error ? <p className="mt-2 break-words text-xs leading-5 text-red-700">即時來源：{source.error}</p> : null}
-            <a href={source.url} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-teal-800 underline underline-offset-2">
+            {source.error ? <p className="mt-2 break-words text-sm leading-5 text-red-700">即時來源：{source.error}</p> : null}
+            <a href={source.url} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-sm font-bold text-teal-800 underline underline-offset-2">
               查看資料集 <ExternalLink className="h-3 w-3" aria-hidden="true" />
             </a>
           </div>
@@ -992,7 +1036,7 @@ function countyWarningPresentation(county: CountyRisk | null, viewState: Warning
   return {
     eyebrow: "CWA 警特報資料已取得",
     title: `${county.countyName} 未列有效縣市警特報`,
-    detail: "這只代表截至本站上方直接取得時間，這份縣市警特報資料未列警示；不代表所有災害都安全，也不取代行程與交通判斷。",
+    detail: "依最近取得的 CWA 資料與目前時間，未列出仍有效的警示；仍須查看下方是否有尚未生效的警特報。這不是安全保證，也不取代行程與交通判斷。",
     icon: Info,
     containerClass: "border-teal-200 bg-teal-50",
     eyebrowClass: "text-teal-900",
@@ -1092,6 +1136,11 @@ function formatRank(item: { countyName: string; stationName: string; value: numb
 function formatNumber(value: number | undefined): string {
   if (value === undefined || !Number.isFinite(value)) return "--";
   return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
+
+function TimeStamp({ value }: { value?: string }) {
+  if (!value || !Number.isFinite(Date.parse(value))) return <span>未提供</span>;
+  return <time dateTime={value}>{formatDateTime(value)}</time>;
 }
 
 function formatDateTime(value: string): string {

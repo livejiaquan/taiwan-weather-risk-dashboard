@@ -9,6 +9,7 @@ import {
 } from "./cwaAdapter";
 import { buildRiskSnapshot, type RiskSnapshot } from "./riskEngine";
 import { hasValidWarningPayload } from "./warningPayloadValidator";
+import { WARNING_MAX_AGE_MS, warningTimeMs } from "./warningTime";
 
 interface DashboardRequestInit extends RequestInit {
   cache?: "no-store";
@@ -80,7 +81,6 @@ interface CacheMergeResult {
   sources: SourceStatus[];
 }
 
-const CACHE_MAX_AGE_MS = 90 * 60 * 1000;
 const INVALID_WARNING_PAYLOAD_ERROR = "Invalid warning payload schema";
 
 const SOURCE_STALE_HOURS: Record<Exclude<CwaSourceKey, "warnings">, number> = {
@@ -521,7 +521,12 @@ function isStale(value: string | undefined, now: Date, staleHours: number): bool
 }
 
 function isSourcePayloadStale(key: CwaSourceKey, updatedAt: string | undefined, now: Date): boolean {
-  if (key === "warnings") return false;
+  if (key === "warnings") {
+    // CWA only republishes on changes: an old publication date is legitimate,
+    // but a missing/invalid or implausibly future publication is not confirmed.
+    const publishedAt = warningTimeMs(updatedAt);
+    return !Number.isFinite(publishedAt) || publishedAt > now.getTime() + MAX_FUTURE_SKEW_MINUTES * 60 * 1000;
+  }
   return isStale(updatedAt, now, SOURCE_STALE_HOURS[key]);
 }
 
@@ -531,7 +536,7 @@ function isCurrentCache(generatedAt: string, now: Date): boolean {
   if (!Number.isFinite(generatedTime) || !Number.isFinite(nowTime)) return false;
 
   const ageMs = nowTime - generatedTime;
-  return ageMs >= 0 && ageMs <= CACHE_MAX_AGE_MS;
+  return ageMs >= 0 && ageMs <= WARNING_MAX_AGE_MS;
 }
 
 function optionalString(value: unknown): string | undefined {
