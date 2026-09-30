@@ -487,13 +487,17 @@ function updatedAtForSource(key: CwaSourceKey, payload: unknown, now: Date): str
 
 function buildObservationSnapshot(payloads: CwaPayloads, now: Date): RiskSnapshot {
   const input = createRiskInputFromCwaPayloads(payloads);
-  const isPlausible = (observedAt: string | undefined) =>
-    !observedAt || (Number.isFinite(Date.parse(observedAt)) &&
-      Date.parse(observedAt) <= now.getTime() + MAX_FUTURE_SKEW_MINUTES * 60 * 1000);
+  const isPlausible = (observedAt: string | undefined, staleHours: number) => {
+    if (!observedAt) return true;
+    const timestamp = Date.parse(observedAt);
+    return Number.isFinite(timestamp) &&
+      timestamp >= now.getTime() - staleHours * 60 * 60 * 1000 &&
+      timestamp <= now.getTime() + MAX_FUTURE_SKEW_MINUTES * 60 * 1000;
+  };
   return buildRiskSnapshot({
     ...input,
-    rainfallStations: input.rainfallStations.filter((station) => isPlausible(station.observedAt)),
-    weatherStations: input.weatherStations.filter((station) => isPlausible(station.observedAt)),
+    rainfallStations: input.rainfallStations.filter((station) => isPlausible(station.observedAt, SOURCE_STALE_HOURS.rainfall)),
+    weatherStations: input.weatherStations.filter((station) => isPlausible(station.observedAt, SOURCE_STALE_HOURS.weather)),
   });
 }
 
