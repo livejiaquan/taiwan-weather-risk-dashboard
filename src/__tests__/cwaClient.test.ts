@@ -367,6 +367,29 @@ describe("loadRiskDashboardData", () => {
     expect(result.snapshot?.sections.rainfall.maxPast1h?.value).toBe(0);
   });
 
+  it("does not rank a station without an observation time beside fresh readings", async () => {
+    const result = await loadRiskDashboardData({
+      fetcher: async (url) => {
+        const payload = validPayloadFor(url);
+        if (url.includes("O-A0002-001")) {
+          const rainfall = payload as { cwaopendata: { dataset: { Station: unknown[] } } };
+          rainfall.cwaopendata.dataset.Station.push({
+            StationName: "無時間雨量站",
+            GeoInfo: { CountyName: "臺北市" },
+            RainfallElement: { Past1hr: { Precipitation: 100 } },
+          });
+        }
+        return new Response(JSON.stringify(payload));
+      },
+      now: () => new Date("2026-05-30T00:30:00+08:00"),
+      cacheUrl: null,
+    });
+
+    expect(result.sources.find((source) => source.key === "rainfall")?.stale).toBe(false);
+    expect(result.snapshot?.sections.rainfall.maxPast1h?.value).toBe(0);
+    expect(result.snapshot?.counties.find((county) => county.countyName === "臺北市")?.metrics.maxPast1h).toBe(0);
+  });
+
   it("does not rank an old station reading beside fresh observations", async () => {
     const result = await loadRiskDashboardData({
       fetcher: async (url) => {

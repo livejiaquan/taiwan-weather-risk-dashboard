@@ -196,6 +196,7 @@ describe("App trust-first warning contract", () => {
     expect(screen.getByRole("heading", { name: "正在確認官方警特報" })).toBeInTheDocument();
     expect(screen.getByText(/資料確認完成前，本站不會顯示沒有警報或其他結論/)).toBeInTheDocument();
     expect(screen.getByText(/正在整理 CWA 警特報與觀測資料/)).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "瀏覽各縣市" })).not.toBeInTheDocument();
     expect(screen.queryByText(/未列有效縣市警特報/)).not.toBeInTheDocument();
     expect(screen.queryByText("整體安全")).not.toBeInTheDocument();
     expect(screen.queryByText(/官方來源讀取正常/)).not.toBeInTheDocument();
@@ -475,8 +476,121 @@ describe("App trust-first warning contract", () => {
     vi.setSystemTime(new Date("2026-05-30T02:01:00+08:00"));
     fireEvent(window, new window.Event("focus"));
     expect(screen.getByRole("heading", { name: "無法確認 臺北市 現況" })).toBeInTheDocument();
-    expect(screen.queryByText("本站整理的下一步：")).not.toBeInTheDocument();
+    expect(screen.queryByText("本站整理：")).not.toBeInTheDocument();
     expect(screen.queryByText("豪雨特報")).not.toBeInTheDocument();
+  });
+
+  it("keeps every active destination warning and long affected-area text beside the result", async () => {
+    window.history.replaceState(null, "", "/?county=臺北市");
+    const warning: WeatherWarning = {
+      countyName: "臺北市", geocode: "63", phenomena: "豪雨", significance: "特報",
+      startTime: "2026-05-30T00:00:00+08:00", endTime: "2026-05-30T04:00:00+08:00",
+      affectedAreas: ["山區", "山區溪河周邊與低窪地區，請以官方細部影響範圍為準"],
+    };
+    arrangeResult(makeCurrentResult([warning, { ...warning, phenomena: "強風", affectedAreas: ["沿海與空曠地區"] }]));
+    render(<App />);
+    const active = await screen.findByRole("region", { name: "臺北市 目前有效的警特報" });
+    expect(within(active).getByRole("heading", { name: "豪雨特報" })).toBeInTheDocument();
+    expect(within(active).getByRole("heading", { name: "強風特報" })).toBeInTheDocument();
+    expect(within(active).getByText(`影響範圍：${warning.affectedAreas.join("、")}`)).toBeInTheDocument();
+    expect(within(active).getAllByText("本站整理：")).toHaveLength(2);
+    expect(within(active).getAllByRole("link", { name: /官方詳情/ })).toHaveLength(2);
+    const destination = screen.getByRole("region", { name: "目的地警特報查詢" });
+    expect(within(destination).getByText("資料確認期限：2026/05/30 02:00")).toBeInTheDocument();
+    expect(within(active).getAllByText("2026/05/30 04:00")).toHaveLength(2);
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+  });
+
+  it.each([true, false])("reveals the selected destination with focus and respects reduced motion=%s", async (reducedMotion) => {
+    arrangeResult(makeCurrentResult());
+    vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: reducedMotion })));
+    render(<App />);
+    const button = await screen.findByRole("button", { name: "查看 臺北市 警特報" });
+    const destination = screen.getByRole("region", { name: "目的地警特報查詢" });
+    destination.scrollIntoView = vi.fn();
+    button.focus();
+    fireEvent.click(button);
+    expect(destination).toHaveFocus();
+    expect(destination.scrollIntoView).toHaveBeenCalledWith({ behavior: reducedMotion ? "auto" : "smooth", block: "start" });
+    expect(screen.getByRole("button", { name: "已選擇 臺北市" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByLabelText("今天要去哪裡？")).toHaveValue("臺北市");
+    vi.unstubAllGlobals();
+  });
+
+  it("keeps region controls named, pressed and independent from the selected destination", async () => {
+    window.history.replaceState(null, "", "/?county=臺北市");
+    arrangeResult(makeCurrentResult());
+    render(<App />);
+    const group = await screen.findByRole("group", { name: "依區域篩選縣市" });
+    fireEvent.click(within(group).getByRole("button", { name: "離島" }));
+    expect(within(group).getByRole("button", { name: "離島" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("離島 · 3 個縣市")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "查看 連江縣 警特報" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "已選擇 臺北市" })).not.toBeInTheDocument();
+    expect(screen.getByLabelText("今天要去哪裡？")).toHaveValue("臺北市");
+    expect(screen.getByRole("heading", { name: "臺北市 未列有效縣市警特報" })).toBeInTheDocument();
+  });
+
+  it("labels upcoming county records before selection without treating them as active", async () => {
+    arrangeResult(makeCurrentResult([{
+      countyName: "臺北市", geocode: "63", phenomena: "豪雨", significance: "特報",
+      startTime: "2026-05-30T01:00:00+08:00", endTime: "2026-05-30T04:00:00+08:00", affectedAreas: ["山區"],
+    }]));
+    render(<App />);
+    const select = await screen.findByRole("button", { name: "查看 臺北市 警特報" });
+    const card = select.closest("article")!;
+    expect(within(card).getByText("已發布、尚未生效 · 1 項")).toBeInTheDocument();
+    expect(within(card).getByText("目前未列")).toBeInTheDocument();
+  });
+
+  it("does not turn an unavailable recent-record feed into a no-cyclone statement", async () => {
+    const result = makeCurrentResult();
+    result.sources = result.sources.map((source) => source.key === "typhoon"
+      ? { ...source, status: "error", provenance: "none", stale: true } : source);
+    arrangeResult(result);
+    render(<App />);
+    const recent = await screen.findByRole("region", { name: "近期紀錄，不代表目前警報" });
+    expect(within(recent).getByText("來源無法確認，沒有可用紀錄")).toBeInTheDocument();
+    expect(within(recent).queryByText(/未列活動中/)).not.toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "上次取得的觀測資料" })).not.toContainElement(recent);
+  });
+
+  it("keeps the destination while refresh is pending and disables repeated refresh clicks", async () => {
+    window.history.replaceState(null, "", "/?county=臺北市");
+    arrangeResult(makeCurrentResult());
+    render(<App />);
+    const refresh = await screen.findByRole("button", { name: "更新資料" });
+    const pending = deferred<RiskDashboardLoadResult>();
+    mockedLoadRiskDashboardData.mockReturnValue(pending.promise);
+    fireEvent.click(refresh);
+    const disabledRefresh = screen.getByRole("button", { name: "更新中" });
+    expect(disabledRefresh).toBeDisabled();
+    fireEvent.click(disabledRefresh);
+    expect(mockedLoadRiskDashboardData).toHaveBeenCalledTimes(2);
+    expect(screen.getByLabelText("今天要去哪裡？")).toHaveValue("臺北市");
+    await act(async () => { pending.resolve(makeUnavailableWarningResult()); });
+    expect(screen.getByRole("heading", { name: "無法確認 臺北市 現況" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "更新資料" })).toBeEnabled();
+  });
+
+  it("does not describe an untrusted fresh feed as having already expired", async () => {
+    const result = makeCurrentResult();
+    result.warnings.currentness = "stale";
+    result.warnings.sourceUpdatedAt = "2026-05-30T05:00:00+08:00";
+    arrangeResult(result);
+    render(<App />);
+    expect(await screen.findByRole("heading", { name: "目前無法確認官方警特報" })).toBeInTheDocument();
+    expect(screen.queryByText(/資料確認期限已過/)).not.toBeInTheDocument();
+    expect(screen.getAllByText("資料確認期限：2026/05/30 02:00").length).toBeGreaterThan(0);
+  });
+
+  it("bases cached confirmation deadlines on cache creation rather than the latest failed retrieval", async () => {
+    const result = makeCachedEmptyWarningResult();
+    arrangeResult(result);
+    render(<App />);
+    const destination = screen.getByRole("region", { name: "目的地警特報查詢" });
+    expect(await within(destination).findByText("資料確認期限：2026/05/30 01:50")).toBeInTheDocument();
+    expect(within(destination).queryByText("資料確認期限：2026/05/30 02:00")).not.toBeInTheDocument();
   });
 
 });

@@ -38,7 +38,7 @@ a {
 button:focus-visible,
 a:focus-visible,
 select:focus-visible {
-  outline: 3px solid rgba(37, 99, 235, 0.62);
+  outline: 3px solid #1d4ed8;
   outline-offset: 3px;
 }
 
@@ -54,5 +54,42 @@ select:focus-visible {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+/* Keep the warning's status, scope and times readable at narrow widths and zoom. */
+.dashboard-shell :where(section, article, footer, header) {
+  min-width: 0;
+}
+
+.dashboard-shell :where(h1, h2, h3, p, time, a, dd) {
+  overflow-wrap: anywhere;
+}
+
+.dashboard-shell :where(time, .source-times, .warning-window) {
+  font-variant-numeric: tabular-nums;
+}
+
+.destination-panel:focus-visible {
+  outline: 3px solid #1d4ed8;
+  outline-offset: 4px;
+}
+
+.state-label {
+  display: inline-flex;
+  align-items: center;
+  border-width: 1px;
+  border-radius: 999px;
+  padding: 0.25rem 0.625rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+@media (forced-colors: active) {
+  button[aria-pressed="true"],
+  .state-label {
+    outline: 2px solid CanvasText;
+    outline-offset: 2px;
   }
 }
