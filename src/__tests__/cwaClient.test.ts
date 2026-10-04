@@ -68,6 +68,20 @@ function validPayloadFor(url: string) {
       },
     };
   }
+  if (url.includes("O-A0001-001")) {
+    return {
+      cwaopendata: {
+        dataset: {
+          Station: [{
+            StationName: "測試氣象站",
+            GeoInfo: { CountyName: "臺北市" },
+            ObsTime: { DateTime: "2026-05-30T00:20:00+08:00" },
+            WeatherElement: { AirTemperature: 25, WindSpeed: 0 },
+          }],
+        },
+      },
+    };
+  }
   return { cwaopendata: { dataset: { Station: [] } } };
 }
 
@@ -91,6 +105,54 @@ describe("warning payload parser contract", () => {
 });
 
 describe("loadRiskDashboardData", () => {
+  it.each([
+    { label: "empty", stations: [] },
+    { label: "invalid-value", stations: [{
+      StationName: "測試氣象站",
+      GeoInfo: { CountyName: "臺北市" },
+      WeatherElement: { AirTemperature: "X", WindSpeed: "bad" },
+    }] },
+  ])("rejects HTTP-success weather feeds with $label measurements", async ({ stations }) => {
+    const result = await loadRiskDashboardData({
+      fetcher: async (url) => new Response(JSON.stringify(
+        url.includes("O-A0001-001")
+          ? { cwaopendata: { dataset: { Station: stations } } }
+          : validPayloadFor(url),
+      )),
+      now: () => new Date("2026-05-30T00:30:00+08:00"),
+      cacheUrl: null,
+    });
+
+    expect(result.sources.find((source) => source.key === "weather")).toMatchObject({
+      status: "error",
+      provenance: "none",
+      stale: true,
+      error: "No usable weather observations",
+    });
+    expect(result.degraded).toBe(true);
+    expect(result.snapshot?.sections.temperature.hottest).toBeUndefined();
+  });
+
+  it("accepts a zero wind measurement as usable weather data", async () => {
+    const result = await loadRiskDashboardData({
+      fetcher: async (url) => new Response(JSON.stringify(
+        url.includes("O-A0001-001")
+          ? { cwaopendata: { dataset: { Station: [{
+            StationName: "測試氣象站",
+            GeoInfo: { CountyName: "臺北市" },
+            ObsTime: { DateTime: "2026-05-30T00:20:00+08:00" },
+            WeatherElement: { WindSpeed: 0 },
+          }] } } }
+          : validPayloadFor(url),
+      )),
+      now: () => new Date("2026-05-30T00:30:00+08:00"),
+      cacheUrl: null,
+    });
+
+    expect(result.sources.find((source) => source.key === "weather")).toMatchObject({ status: "success", stale: false });
+    expect(result.snapshot?.sections.wind.maxAverage?.value).toBe(0);
+  });
+
   it("can load the static cache directly for a fast first paint", async () => {
     const result = await loadCachedRiskDashboardData({
       fetcher: async () =>

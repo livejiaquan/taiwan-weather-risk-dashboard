@@ -4,6 +4,7 @@ import {
   normalizeEarthquakeData,
   normalizeRainfallData,
   normalizeTyphoonData,
+  normalizeWeatherStationData,
   type CwaPayloads,
   type CwaSourceKey,
 } from "./cwaAdapter";
@@ -176,6 +177,9 @@ async function loadSource(
     if (key === "rainfall" && !hasUsableRainfallObservation(payload)) {
       throw new Error("No usable rainfall observations");
     }
+    if (key === "weather" && !hasUsableWeatherObservation(payload)) {
+      throw new Error("No usable weather observations");
+    }
     const updatedAt = updatedAtForSource(key, payload, now);
 
     return {
@@ -215,6 +219,12 @@ async function loadSource(
 function hasUsableRainfallObservation(payload: unknown): boolean {
   return normalizeRainfallData(payload).some(
     (station) => station.past1h !== undefined || station.past3h !== undefined || station.past24h !== undefined,
+  );
+}
+
+function hasUsableWeatherObservation(payload: unknown): boolean {
+  return normalizeWeatherStationData(payload).some(
+    (station) => station.temperature !== undefined || station.windSpeed !== undefined || station.gustSpeed !== undefined,
   );
 }
 
