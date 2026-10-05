@@ -483,10 +483,20 @@ function updatedAtForSource(key: CwaSourceKey, payload: unknown, now: Date): str
   if (key === "warnings") return optionalString(raw?.cwaopendata?.sent);
   if (key === "earthquake") return normalizeEarthquakeData(raw)?.occurredAt;
   if (key === "typhoon") return normalizeTyphoonData(raw)?.latestAt;
-  if (key === "rainfall" || key === "weather") {
+  if (key === "rainfall") {
     return latestDate(
-      asArray(raw?.cwaopendata?.dataset?.Station)
-        .map((station) => optionalString(station?.ObsTime?.DateTime))
+      normalizeRainfallData(raw)
+        .filter((station) => station.past1h !== undefined || station.past3h !== undefined || station.past24h !== undefined)
+        .map((station) => station.observedAt)
+        .filter((value): value is string => Boolean(value)),
+      now,
+    );
+  }
+  if (key === "weather") {
+    return latestDate(
+      normalizeWeatherStationData(raw)
+        .filter((station) => station.temperature !== undefined || station.windSpeed !== undefined || station.gustSpeed !== undefined)
+        .map((station) => station.observedAt)
         .filter((value): value is string => Boolean(value)),
       now,
     );
@@ -546,9 +556,4 @@ function isCurrentCache(generatedAt: string, now: Date): boolean {
 
 function optionalString(value: unknown): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined;
-}
-
-function asArray<T>(value: T | T[] | null | undefined): T[] {
-  if (value === null || value === undefined) return [];
-  return Array.isArray(value) ? value : [value];
 }

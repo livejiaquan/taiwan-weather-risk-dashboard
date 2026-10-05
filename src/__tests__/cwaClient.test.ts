@@ -378,6 +378,37 @@ describe("loadRiskDashboardData", () => {
     expect(implausiblyFuture.degraded).toBe(true);
   });
 
+  it.each(["rainfall", "weather"])("does not let a fresh value-less %s station mask stale usable readings", async (source) => {
+    const result = await loadRiskDashboardData({
+      fetcher: async (url) => {
+        const payload = validPayloadFor(url);
+        const target = source === "rainfall" ? "O-A0002-001" : "O-A0001-001";
+        if (url.includes(target)) {
+          const observation = payload as { cwaopendata: { dataset: { Station: Array<Record<string, unknown>> } } };
+          observation.cwaopendata.dataset.Station[0].ObsTime = { DateTime: "2026-05-29T20:00:00+08:00" };
+          observation.cwaopendata.dataset.Station.push({
+            StationName: "缺值新測站",
+            GeoInfo: { CountyName: "臺北市" },
+            ObsTime: { DateTime: "2026-05-30T00:25:00+08:00" },
+            ...(source === "rainfall"
+              ? { RainfallElement: { Past1hr: { Precipitation: "X" } } }
+              : { WeatherElement: { AirTemperature: "X", WindSpeed: "X" } }),
+          });
+        }
+        return new Response(JSON.stringify(payload));
+      },
+      now: () => new Date("2026-05-30T00:30:00+08:00"),
+      cacheUrl: null,
+    });
+
+    expect(result.sources.find((status) => status.key === source)).toMatchObject({
+      status: "success",
+      updatedAt: "2026-05-29T20:00:00+08:00",
+      stale: true,
+    });
+    expect(result.degraded).toBe(true);
+  });
+
   it("does not let one future-dated station mask a fresh observation source", async () => {
     const result = await loadRiskDashboardData({
       fetcher: async (url) => {
