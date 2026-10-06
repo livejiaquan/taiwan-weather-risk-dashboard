@@ -105,6 +105,25 @@ describe("warning payload parser contract", () => {
 });
 
 describe("loadRiskDashboardData", () => {
+  it("does not present a future-dated warning feed as current coverage", async () => {
+    const result = await loadRiskDashboardData({
+      fetcher: async (url) => new Response(JSON.stringify(
+        url.includes("W-C0033-001")
+          ? completeWarningPayload("2026-05-30T01:00:00+08:00")
+          : validPayloadFor(url),
+      )),
+      now: () => new Date("2026-05-30T00:30:00+08:00"),
+      cacheUrl: null,
+    });
+
+    expect(result.sources.find((source) => source.key === "warnings")).toMatchObject({
+      status: "success",
+      stale: true,
+    });
+    expect(result.warnings).toMatchObject({ coverage: "current", currentness: "stale" });
+    expect(result.degraded).toBe(true);
+  });
+
   it.each([
     { label: "empty", stations: [] },
     { label: "invalid-value", stations: [{
@@ -237,6 +256,38 @@ describe("loadRiskDashboardData", () => {
     expect(result?.snapshot?.national.activeWarningCountyCount).toBe(0);
     expect(result?.warnings.coverage).toBe("cached");
     expect(result?.warnings.coverage).not.toBe("current");
+  });
+
+  it("does not present a future-dated cached warning feed as current coverage", async () => {
+    const result = await loadCachedRiskDashboardData({
+      fetcher: async () => new Response(JSON.stringify({
+        generatedAt: "2026-05-30T00:10:00+08:00",
+        payloads: {
+          warningPayload: completeWarningPayload("2026-05-30T01:00:00+08:00"),
+        },
+      })),
+      now: () => new Date("2026-05-30T00:30:00+08:00"),
+    });
+
+    expect(result?.sources.find((source) => source.key === "warnings")).toMatchObject({
+      provenance: "cache",
+      stale: true,
+    });
+    expect(result?.warnings).toMatchObject({ coverage: "cached", currentness: "stale" });
+  });
+
+  it("allows a five-minute warning publication clock skew", async () => {
+    const result = await loadRiskDashboardData({
+      fetcher: async (url) => new Response(JSON.stringify(
+        url.includes("W-C0033-001")
+          ? completeWarningPayload("2026-05-30T00:35:00+08:00")
+          : validPayloadFor(url),
+      )),
+      now: () => new Date("2026-05-30T00:30:00+08:00"),
+      cacheUrl: null,
+    });
+
+    expect(result.warnings).toMatchObject({ coverage: "current", currentness: "current" });
   });
 
   it("uses fresh cache generation time for warning currentness even when sent is old", async () => {

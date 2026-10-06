@@ -541,7 +541,11 @@ function isStale(value: string | undefined, now: Date, staleHours: number): bool
 }
 
 function isSourcePayloadStale(key: CwaSourceKey, updatedAt: string | undefined, now: Date): boolean {
-  if (key === "warnings") return false;
+  // A warning feed may legitimately have an old sent time when no warning has
+  // changed, but a sent time far ahead of our clock cannot confirm coverage.
+  if (key === "warnings") {
+    return !updatedAt || Date.parse(updatedAt) > now.getTime() + MAX_FUTURE_SKEW_MINUTES * 60 * 1000;
+  }
   return isStale(updatedAt, now, SOURCE_STALE_HOURS[key]);
 }
 
