@@ -6,6 +6,7 @@ import { validateWarningPayload } from "../src/lib/warningPayloadValidator";
 const DEFAULT_DEPLOYMENT_URL =
   "https://livejiaquan.github.io/taiwan-weather-risk-dashboard/data/latest.json";
 const MAX_AGE_MS = 90 * 60 * 1000;
+const MAX_WARNING_FUTURE_SKEW_MS = 5 * 60 * 1000;
 const REQUEST_TIMEOUT_MS = 10_000;
 const RETRY_DELAY_MS = 250;
 
@@ -53,6 +54,11 @@ export function checkDeploymentFreshness(
     throw new Error("deployment cache timestamps must match");
   }
   validateWarningPayload(payloads.warningPayload);
+  const warning = requireRecord(payloads.warningPayload, "deployment cache.payloads.warningPayload");
+  const envelope = requireRecord(warning.cwaopendata, "warning payload.cwaopendata");
+  if (parseDate(envelope.sent, "warning payload.cwaopendata.sent") > now.getTime() + MAX_WARNING_FUTURE_SKEW_MS) {
+    throw new Error("deployment warning feed is in the future and cannot confirm current coverage");
+  }
 
   return {
     ageMinutes: Math.max(0, ageMs) / 60_000,

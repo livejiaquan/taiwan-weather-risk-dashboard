@@ -137,6 +137,20 @@ describe("deployment freshness probe", () => {
     expect(() => checkDeploymentFreshness(incomplete, now)).toThrow(/cover exactly 22 counties/);
   });
 
+  it("rejects a future-dated warning feed even when the cache itself is fresh", () => {
+    const cache = cacheDocument("2026-08-24T11:30:00Z");
+    cache.payloads.warningPayload.cwaopendata.sent = "2026-08-24T12:05:01Z";
+
+    expect(() => checkDeploymentFreshness(cache, now)).toThrow(/warning feed.*future/);
+  });
+
+  it("allows the same five-minute warning clock skew as the browser", () => {
+    const cache = cacheDocument("2026-08-24T11:30:00Z");
+    cache.payloads.warningPayload.cwaopendata.sent = "2026-08-24T12:05:00Z";
+
+    expect(checkDeploymentFreshness(cache, now).ageMinutes).toBe(30);
+  });
+
   it("retries one transient server error before failing the probe", async () => {
     const generatedAt = new Date().toISOString();
     const fetchImpl = vi
