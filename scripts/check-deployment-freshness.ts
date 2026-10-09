@@ -77,9 +77,7 @@ export async function main(
   try {
     document = await fetchDeploymentDocument(target, fetchImpl);
   } catch (error) {
-    if (!(error instanceof HttpStatusError) || error.status < 500 || error.status >= 600) {
-      throw error;
-    }
+    if (!isTransientProbeError(error)) throw error;
     await new Promise((resolvePromise) => globalThis.setTimeout(resolvePromise, RETRY_DELAY_MS));
     document = await fetchDeploymentDocument(target, fetchImpl);
   }
@@ -89,6 +87,12 @@ export async function main(
     `Deployment cache healthy: generated ${result.generatedAt}, age ${result.ageMinutes.toFixed(1)} minutes`,
   );
   return result;
+}
+
+function isTransientProbeError(error: unknown): boolean {
+  if (error instanceof HttpStatusError) return error.status >= 500 && error.status < 600;
+  if (error instanceof TypeError) return true;
+  return error instanceof Error && error.name === "AbortError";
 }
 
 async function fetchDeploymentDocument(target: URL, fetchImpl: typeof fetch): Promise<unknown> {

@@ -172,6 +172,22 @@ describe("deployment freshness probe", () => {
     }
   });
 
+  it("retries a transient network failure before declaring the deployed cache unavailable", async () => {
+    const generatedAt = new Date().toISOString();
+    const fetchImpl = vi.fn()
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+      .mockResolvedValueOnce({ ok: true, json: async () => cacheDocument(generatedAt) }) as unknown as typeof fetch;
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    try {
+      await expect(main("https://example.test/latest.json", fetchImpl)).resolves.toMatchObject({
+        generatedAt: new Date(generatedAt).toISOString(),
+      });
+      expect(fetchImpl).toHaveBeenCalledTimes(2);
+    } finally {
+      logSpy.mockRestore();
+    }
+  });
+
   it("stops after one transient server-error retry", async () => {
     const fetchImpl = vi.fn().mockResolvedValue({ ok: false, status: 503 }) as unknown as typeof fetch;
 
@@ -179,6 +195,20 @@ describe("deployment freshness probe", () => {
       /HTTP 503/,
     );
     expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
+  it("stops after one transient network retry", async () => {
+    const fetchImpl = vi.fn().mockRejectedValue(new TypeError("Failed to fetch")) as unknown as typeof fetch;
+
+    await expect(main("https://example.test/latest.json", fetchImpl)).rejects.toThrow("Failed to fetch");
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not retry a missing deployment artifact", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({ ok: false, status: 404 }) as unknown as typeof fetch;
+
+    await expect(main("https://example.test/latest.json", fetchImpl)).rejects.toThrow(/HTTP 404/);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
   it("keeps the request timeout active while parsing the response body", async () => {
@@ -204,7 +234,10 @@ describe("deployment freshness probe", () => {
     await bodyParsing;
     expect(timerMocks.clearTimeout).not.toHaveBeenCalled();
     timerMocks.trigger();
+    await vi.waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(2));
+    timerMocks.trigger();
 
     await expect(probe).rejects.toMatchObject({ name: "AbortError" });
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
   });
 });
