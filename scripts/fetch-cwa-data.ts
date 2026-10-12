@@ -60,6 +60,7 @@ const DEFAULT_OUTPUT_PATH = resolve("public/data/latest.json");
 const DEFAULT_TIMEOUT_MS = 8000;
 const DEFAULT_RETRY_DELAY_MS = 250;
 const MAX_CACHE_BYTES = 64 * 1024;
+const MAX_WARNING_FUTURE_SKEW_MS = 5 * 60 * 1000;
 const CACHE_SOURCE_KEYS: CwaSourceKey[] = ["warnings"];
 const CRITICAL_SOURCE_KEYS = new Set<CwaSourceKey>(["warnings"]);
 
@@ -145,6 +146,10 @@ export async function main(options: FetchDataOptions = {}): Promise<CacheDocumen
   }
 
   const payloadFor = (key: CwaSourceKey) => results.find((result) => result.key === key)?.payload ?? null;
+  const warningPayload = payloadFor("warnings") as { cwaopendata: { sent: string } };
+  if (Date.parse(warningPayload.cwaopendata.sent) > Date.parse(generatedAt) + MAX_WARNING_FUTURE_SKEW_MS) {
+    throw new Error("Warning feed is in the future; refusing to replace cache.");
+  }
   const sources: CachedSource[] = results.map((result) => result.source);
 
   const cache: CacheDocument = {

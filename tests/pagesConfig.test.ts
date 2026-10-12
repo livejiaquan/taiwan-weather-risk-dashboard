@@ -553,6 +553,37 @@ describe("CWA cache replacement", () => {
     expect(files.implementation.rename).not.toHaveBeenCalled();
   });
 
+  it("refuses to publish a future-dated warning feed while preserving the existing cache", async () => {
+    const files = mockFileSystem();
+    const payload = warningPayload();
+    payload.cwaopendata.sent = "2026-08-09T15:20:01Z";
+
+    await expect(fetchCwaData({
+      fetchImpl: mockFetch({ [CWA_ENDPOINTS.warnings.url]: { status: 200, payload } }),
+      outputPath: "/virtual/latest.json",
+      now: () => new Date("2026-08-09T15:15:00Z"),
+      fileSystem: files.implementation,
+      logger: { log: vi.fn(), warn: vi.fn() },
+    })).rejects.toThrow(/future/);
+    expect(files.implementation.writeFile).not.toHaveBeenCalled();
+    expect(files.implementation.rename).not.toHaveBeenCalled();
+  });
+
+  it("allows five minutes of warning clock skew when generating the cache", async () => {
+    const files = mockFileSystem();
+    const payload = warningPayload();
+    payload.cwaopendata.sent = "2026-08-09T15:20:00Z";
+
+    await expect(fetchCwaData({
+      fetchImpl: mockFetch({ [CWA_ENDPOINTS.warnings.url]: { status: 200, payload } }),
+      outputPath: "/virtual/latest.json",
+      now: () => new Date("2026-08-09T15:15:00Z"),
+      fileSystem: files.implementation,
+      logger: { log: vi.fn(), warn: vi.fn() },
+    })).resolves.toMatchObject({ generatedAt: "2026-08-09T15:15:00.000Z" });
+    expect(files.implementation.rename).toHaveBeenCalledOnce();
+  });
+
   it("refuses to write a complete county list with malformed warning hazards", async () => {
     const files = mockFileSystem();
     await expect(
