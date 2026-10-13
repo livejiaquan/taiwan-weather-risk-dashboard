@@ -60,6 +60,34 @@ describe("CWA observation adapters", () => {
     expect(stations[0]).toMatchObject({ past1h: undefined, past3h: 0, past24h: 100 });
   });
 
+  it("does not treat numeric missing-value codes as weather or rainfall measurements", () => {
+    const rainfall = normalizeRainfallData({
+      cwaopendata: { dataset: { Station: [{
+        StationName: "秀林",
+        GeoInfo: { CountyName: "花蓮縣" },
+        RainfallElement: {
+          Past1hr: { Precipitation: -99 },
+          Past3hr: { Precipitation: -98 },
+          Past24hr: { Precipitation: 0 },
+        },
+      }] } },
+    });
+    const weather = normalizeWeatherStationData({
+      cwaopendata: { dataset: { Station: [{
+        StationName: "基隆",
+        GeoInfo: { CountyName: "基隆市" },
+        WeatherElement: {
+          AirTemperature: -99,
+          WindSpeed: -98,
+          GustInfo: { PeakGustSpeed: 0 },
+        },
+      }] } },
+    });
+
+    expect(rainfall[0]).toMatchObject({ past1h: undefined, past3h: undefined, past24h: 0 });
+    expect(weather[0]).toMatchObject({ temperature: undefined, windSpeed: undefined, gustSpeed: 0 });
+  });
+
   it("normalizes temperature, wind speed, and gust speed from weather stations", () => {
     const stations = normalizeWeatherStationData({
       cwaopendata: {

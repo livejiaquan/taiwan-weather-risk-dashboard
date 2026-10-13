@@ -156,7 +156,9 @@ export function createRiskInputFromCwaPayloads(payloads: CwaPayloads): RiskSnaps
 }
 
 function parseCwaNumber(value: unknown): number | undefined {
-  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "number") {
+    return Number.isFinite(value) && value !== -99 && value !== -98 ? value : undefined;
+  }
   if (typeof value !== "string") return undefined;
 
   const normalized = value.trim();
