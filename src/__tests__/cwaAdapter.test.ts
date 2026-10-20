@@ -151,6 +151,30 @@ describe("CWA hazard adapters", () => {
     });
   });
 
+  it("omits unavailable county intensity instead of reporting zero shaking", () => {
+    const earthquake = normalizeEarthquakeData({
+      cwaopendata: {
+        Earthquake: {
+          Intensity: {
+            County: [
+              { CountyName: "花蓮縣", CountyMaxIntensity: "5弱" },
+              { CountyName: "臺北市", CountyMaxIntensity: "0級" },
+              { CountyName: "宜蘭縣", CountyMaxIntensity: "-99" },
+              { CountyName: "桃園市", CountyMaxIntensity: "X" },
+              { CountyName: "新竹縣" },
+              { CountyName: "苗栗縣", CountyMaxIntensity: -98 },
+            ],
+          },
+        },
+      },
+    });
+
+    expect(earthquake?.countyIntensities).toEqual([
+      { countyName: "花蓮縣", maxIntensity: 5 },
+      { countyName: "臺北市", maxIntensity: 0 },
+    ]);
+  });
+
   it("normalizes active tropical cyclone tracks and estimates distance to Taiwan", () => {
     const typhoon = normalizeTyphoonData({
       cwaopendata: {

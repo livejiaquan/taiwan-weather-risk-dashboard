@@ -105,11 +105,9 @@ export function normalizeEarthquakeData(raw: any): EarthquakeSignal | null {
     countyIntensities: asArray(earthquake?.Intensity?.County)
       .map((county) => {
         const countyName = stringOrEmpty(county?.CountyName);
-        if (!countyName) return null;
-        return {
-          countyName,
-          maxIntensity: parseIntensity(county?.CountyMaxIntensity),
-        };
+        const maxIntensity = parseIntensity(county?.CountyMaxIntensity);
+        if (!countyName || maxIntensity === undefined) return null;
+        return { countyName, maxIntensity };
       })
       .filter((intensity): intensity is { countyName: string; maxIntensity: number } => intensity !== null),
   };
@@ -170,11 +168,11 @@ function parseCwaNumber(value: unknown): number | undefined {
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
-function parseIntensity(value: unknown): number {
-  if (typeof value === "number" && Number.isFinite(value)) return value;
-  if (typeof value !== "string") return 0;
-  const match = value.match(/\d+/);
-  return match ? Number.parseInt(match[0], 10) : 0;
+function parseIntensity(value: unknown): number | undefined {
+  if (typeof value === "number") return Number.isInteger(value) && value >= 0 && value <= 7 ? value : undefined;
+  if (typeof value !== "string") return undefined;
+  const match = value.trim().match(/^([0-7])(?:級|[強弱])?$/);
+  return match ? Number(match[1]) : undefined;
 }
 
 function latestByDate<T>(items: T[], getDate: (item: T) => string | undefined): T | undefined {
