@@ -4,8 +4,8 @@
 
 ### Context Checked
 
-- Target folder `/Users/jiaquan/taiwan-weather-risk-dashboard` was empty and not a Git repository.
-- Reference project found at `/Users/jiaquan/Development/acc/taiwan-reservoir-static`.
+- Target folder `taiwan-weather-risk-dashboard/` was empty and not a Git repository.
+- Reference project found at the sibling `taiwan-reservoir-static` project.
 - Reference design uses Noto Sans TC, bright gradient header, public-data cards, soft shadows, stat cards, chart sections, warning cards, and a source-heavy footer.
 - Official CWA dataset pages and AWS OpenData mirror were checked.
 
