@@ -27,7 +27,13 @@
 - 警特報來源失敗時 fail closed，不把空資料解讀成無警報。
 - 雨量、風速與溫度另列為 CWA 觀測脈絡。
 - 地震報告與區域熱帶氣旋另列為近期紀錄，不納入目前天氣警報判斷。
+- 全台縣市警特報地圖：依 CWA 的「警報」「特報」字詞上色；「未列」用中性色而非綠色，快取或無法確認時整張地圖加斜線。
+- 警特報依種類分組（例如「陸上強風特報：全台 22 個縣市」），逐縣市保留影響範圍與有效時間。
+- 頁首資料狀態燈號（即時／快取／無法確認／建議更新）與相對時間；頁面開著超過 30 分鐘會提示更新。
+- 深色／淺色模式（預設跟隨系統，可手動切換）。
 - Loading、empty、partial、cached、fatal 與 responsive desktop/mobile 狀態。
+
+介面設計依據與同類產品調查見 [`docs/design-research.md`](./docs/design-research.md)。
 
 ## 資料來源與語義
 
@@ -68,6 +74,10 @@ npm run build
 ```
 
 會影響使用者看到的變更，還必須從 production build 實際檢查 desktop/mobile、主要資料狀態、互動、overflow 與 browser console；build success 本身不是完整驗收。
+
+## 縣市地圖
+
+`src/lib/countyShapes.ts` 由 `npm run build:map` 產生：讀取 `scripts/data/counties-mercator-10t.json`（[taiwan-atlas](https://github.com/dkaoster/taiwan-atlas)，MIT，源自內政部「直轄市、縣市界線」開放資料），簡化後輸出預先投影的 SVG path（約 30 KiB），執行期不需要地圖函式庫或圖磚。
 
 ## Static cache
 

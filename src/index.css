@@ -1,18 +1,63 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@400;500;700;900&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@400;500;700;900&display=swap");
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Status ladder (map fills, badges):
+ *   alarm    — CWA significance 「警報」 (e.g. 颱風警報)
+ *   advisory — CWA significance 「特報」 (e.g. 大雨、強風特報)
+ *   calm     — current data lists no valid warning; deliberately NOT green,
+ *              because 未列警特報 is not a safety verdict
+ *   unknown  — source unavailable or not yet confirmed
+ */
 :root {
   color-scheme: light;
-  font-family: "Inter", "Noto Sans TC", ui-sans-serif, system-ui, sans-serif;
-  color: #10211c;
-  background: #f6f7f2;
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  --bg: 236 241 244;
+  --surface: 255 255 255;
+  --raised: 245 248 250;
+  --ink: 15 30 43;
+  --muted: 79 95 109;
+  --line: 208 218 225;
+  --accent: 24 88 160;
+  --accent-ink: 255 255 255;
+  --accent-soft: 225 236 248;
+  --alarm: 200 38 61;
+  --alarm-ink: 158 22 44;
+  --alarm-soft: 252 230 233;
+  --advisory: 238 152 30;
+  --advisory-ink: 122 69 0;
+  --advisory-soft: 254 240 214;
+  --calm: 184 199 210;
+  --calm-ink: 52 69 84;
+  --unknown: 214 219 223;
+  --unknown-ink: 84 94 102;
+  --sea: 222 232 238;
+}
+
+:root.dark {
+  color-scheme: dark;
+  --bg: 11 21 30;
+  --surface: 18 31 42;
+  --raised: 25 41 54;
+  --ink: 228 236 242;
+  --muted: 152 170 184;
+  --line: 40 59 74;
+  --accent: 110 168 240;
+  --accent-ink: 8 22 38;
+  --accent-soft: 24 46 72;
+  --alarm: 240 92 108;
+  --alarm-ink: 255 160 170;
+  --alarm-soft: 62 24 33;
+  --advisory: 242 176 70;
+  --advisory-ink: 248 202 120;
+  --advisory-soft: 60 44 18;
+  --calm: 52 74 92;
+  --calm-ink: 186 202 214;
+  --unknown: 46 56 64;
+  --unknown-ink: 170 180 188;
+  --sea: 15 30 42;
 }
 
 * {
@@ -21,13 +66,19 @@
 
 html {
   min-width: 320px;
-  background: #f6f7f2;
+  background: rgb(var(--bg));
   scroll-behavior: smooth;
 }
 
 body {
   margin: 0;
-  background: #f6f7f2;
+  background: rgb(var(--bg));
+  color: rgb(var(--ink));
+  font-family: "Barlow", "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", ui-sans-serif, system-ui, sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 button,
@@ -37,13 +88,22 @@ a {
 
 button:focus-visible,
 a:focus-visible,
-select:focus-visible {
-  outline: 3px solid rgba(37, 99, 235, 0.62);
+select:focus-visible,
+[tabindex]:focus-visible {
+  outline: 3px solid rgb(var(--accent) / 0.7);
   outline-offset: 3px;
 }
 
 ::selection {
-  background: rgba(37, 99, 235, 0.18);
+  background: rgb(var(--accent) / 0.22);
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+.county-shape {
+  transition: fill 240ms ease, opacity 160ms ease;
 }
 
 @media (prefers-reduced-motion: reduce) {
