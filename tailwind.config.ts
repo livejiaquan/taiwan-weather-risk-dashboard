@@ -14,6 +14,18 @@ export default {
         // through to the platform's own CJK face, so no multi-MB webfont loads.
         sans: ["Barlow", "PingFang TC", "Noto Sans TC", "Noto Sans CJK TC", "Microsoft JhengHei", "ui-sans-serif", "system-ui", "sans-serif"],
       },
+      // The only type sizes allowed (px): 12 / 14 / 16 / 18 / 22 / 28 / 36 / 48 / 64.
+      fontSize: {
+        xs: ["0.75rem", { lineHeight: "1.5" }],
+        sm: ["0.875rem", { lineHeight: "1.6" }],
+        base: ["1rem", { lineHeight: "1.75" }],
+        lg: ["1.125rem", { lineHeight: "1.6" }],
+        xl: ["1.375rem", { lineHeight: "1.4" }],
+        "2xl": ["1.75rem", { lineHeight: "1.3" }],
+        "3xl": ["2.25rem", { lineHeight: "1.2" }],
+        "4xl": ["3rem", { lineHeight: "1.15" }],
+        "5xl": ["4rem", { lineHeight: "1.1" }],
+      },
       // Radius encodes hierarchy: controls < inner blocks < panels.
       borderRadius: {
         control: "0.5rem",
