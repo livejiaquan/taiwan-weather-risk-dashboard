@@ -661,8 +661,10 @@ function MapSection({
           />
         </div>
       </div>
-      <div className="min-w-0 lg:pt-16">
-        <ul className="grid gap-x-8 gap-y-4 sm:grid-cols-2" aria-label="地圖圖例">
+      <div className="min-w-0">
+        {/* Same heading structure as the map column, so the legend starts level with the map. */}
+        <SectionHeading id="legend-title" title="怎麼讀這張地圖" description="顏色只代表 CWA 自己的分級，不是本站的風險分數。" />
+        <ul className="grid gap-x-8 gap-y-4 sm:grid-cols-2" aria-labelledby="legend-title">
           {counts.map((item) => (
             <li key={item.status} className="flex items-start gap-3">
               <span
