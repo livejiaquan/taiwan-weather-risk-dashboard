@@ -20,6 +20,21 @@ export function warningViewState(result: RiskDashboardLoadResult | null): Warnin
   return "unavailable";
 }
 
+/** Matches the static cache budget in cwaClient: older warning data is not trusted. */
+export const WARNING_TRUST_WINDOW_MINUTES = 90;
+
+/**
+ * Like warningViewState, but also expires trust as the page stays open: once the
+ * last confirmation is older than the trust window, the page fails closed.
+ */
+export function warningViewStateAt(result: RiskDashboardLoadResult | null, now: number): WarningViewState {
+  const base = warningViewState(result);
+  if (!result || base === "unavailable") return "unavailable";
+  const confirmedAt = base === "cached" ? result.warnings.cacheGeneratedAt : result.warnings.fetchedAt;
+  const age = minutesSince(confirmedAt, now);
+  return age === null || age > WARNING_TRUST_WINDOW_MINUTES ? "unavailable" : base;
+}
+
 /** CWA's own significance word decides the tone; this is not a site risk score. */
 export function warningTone(warning: WeatherWarning): "alarm" | "advisory" {
   return warning.significance.includes("警報") ? "alarm" : "advisory";

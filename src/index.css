@@ -10,7 +10,8 @@
  *   advisory — CWA significance 「特報」 (e.g. 大雨、強風特報)
  *   calm     — current data lists no valid warning; deliberately NOT green,
  *              because 未列警特報 is not a safety verdict
- *   unknown  — source unavailable or not yet confirmed
+ *   unknown  — source unavailable or not yet confirmed; always hatched
+ * Map fills keep >= 3:1 contrast against --sea (unknown relies on its hatch).
  */
 :root {
   color-scheme: light;
@@ -26,14 +27,14 @@
   --alarm: 200 38 61;
   --alarm-ink: 158 22 44;
   --alarm-soft: 252 230 233;
-  --advisory: 238 152 30;
+  --advisory: 204 122 10;
   --advisory-ink: 122 69 0;
   --advisory-soft: 254 240 214;
-  --calm: 184 199 210;
+  --calm: 125 146 161;
   --calm-ink: 52 69 84;
-  --unknown: 214 219 223;
+  --unknown: 157 169 178;
   --unknown-ink: 84 94 102;
-  --sea: 222 232 238;
+  --sea: 244 247 249;
 }
 
 :root.dark {
@@ -53,11 +54,11 @@
   --advisory: 242 176 70;
   --advisory-ink: 248 202 120;
   --advisory-soft: 60 44 18;
-  --calm: 52 74 92;
+  --calm: 91 117 133;
   --calm-ink: 186 202 214;
-  --unknown: 46 56 64;
+  --unknown: 94 107 117;
   --unknown-ink: 170 180 188;
-  --sea: 15 30 42;
+  --sea: 12 24 34;
 }
 
 * {

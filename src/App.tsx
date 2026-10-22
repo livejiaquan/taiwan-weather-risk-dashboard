@@ -40,6 +40,7 @@ import {
   sourceSummary,
   warningTone,
   warningViewState,
+  warningViewStateAt,
   type MapCountyStatus,
   type Tone,
   type WarningViewState,
@@ -83,6 +84,11 @@ const TONE_CHIP: Record<Tone, string> = {
   calm: "bg-raised text-calm-ink",
   unknown: "bg-raised text-unknown-ink",
   accent: "bg-accent-soft text-accent",
+};
+
+// Mirrors the map's hatch so "待確認" is distinguishable without relying on colour.
+const HATCH_STYLE = {
+  backgroundImage: "repeating-linear-gradient(45deg, rgb(var(--surface) / 0.75) 0 1.5px, transparent 1.5px 4px)",
 };
 
 const MAP_LEGEND: Array<{ status: MapCountyStatus; label: string; hint: string }> = [
@@ -167,7 +173,7 @@ export function App() {
   }, []);
 
   const snapshot = state.data?.snapshot ?? null;
-  const viewState = warningViewState(state.data);
+  const viewState = warningViewStateAt(state.data, now);
   const selectedCounty = snapshot?.counties.find((county) => county.countyName === selectedCountyName) ?? null;
   const isLoading = state.status === "loading";
 
@@ -199,6 +205,7 @@ export function App() {
 
       <SiteHeader
         result={state.data}
+        viewState={viewState}
         isLoading={isLoading}
         now={now}
         onRefresh={() => void load()}
@@ -215,6 +222,7 @@ export function App() {
         >
           <DestinationPanel
             state={state}
+            viewState={viewState}
             result={state.data}
             selectedCounty={selectedCounty}
             selectedCountyName={selectedCountyName}
@@ -237,7 +245,7 @@ export function App() {
             <FatalState error={state.error} sources={state.data?.sources ?? []} onRetry={() => void load()} />
           ) : snapshot ? (
             <>
-              <StateBanner result={state.data} isRefreshing={isLoading} />
+              <StateBanner result={state.data} viewState={viewState} isRefreshing={isLoading} />
               <WarningSection
                 warnings={snapshot.counties.flatMap((county) => county.warnings)}
                 warningState={viewState}
@@ -264,6 +272,7 @@ export function App() {
 
 function SiteHeader({
   result,
+  viewState,
   isLoading,
   now,
   onRefresh,
@@ -271,6 +280,7 @@ function SiteHeader({
   onToggleTheme,
 }: {
   result: RiskDashboardLoadResult | null;
+  viewState: WarningViewState;
   isLoading: boolean;
   now: number;
   onRefresh: () => void;
@@ -288,7 +298,7 @@ function SiteHeader({
           </span>
         </a>
         <div className="flex items-center gap-2">
-          <FreshnessPill result={result} isLoading={isLoading} now={now} />
+          <FreshnessPill result={result} viewState={viewState} isLoading={isLoading} now={now} />
           <button
             type="button"
             onClick={onRefresh}
@@ -322,8 +332,17 @@ function BrandMark() {
   );
 }
 
-function FreshnessPill({ result, isLoading, now }: { result: RiskDashboardLoadResult | null; isLoading: boolean; now: number }) {
-  const viewState = warningViewState(result);
+function FreshnessPill({
+  result,
+  viewState,
+  isLoading,
+  now,
+}: {
+  result: RiskDashboardLoadResult | null;
+  viewState: WarningViewState;
+  isLoading: boolean;
+  now: number;
+}) {
   if (!result) {
     return (
       <span className="inline-flex h-10 items-center gap-2 rounded-lg border border-line bg-surface px-3 text-sm font-semibold text-muted">
@@ -333,11 +352,23 @@ function FreshnessPill({ result, isLoading, now }: { result: RiskDashboardLoadRe
     );
   }
 
-  const confirmedAt = viewState === "cached" ? result.warnings.cacheGeneratedAt : result.warnings.fetchedAt;
+  const sourceState = warningViewState(result);
+  const confirmedAt = sourceState === "cached" ? result.warnings.cacheGeneratedAt : result.warnings.fetchedAt;
   const age = minutesSince(confirmedAt, now);
+  const expired = viewState === "unavailable" && sourceState !== "unavailable";
   const aging = viewState === "current" && age !== null && age >= REFRESH_SUGGESTED_AFTER_MINUTES;
-  const tone: Tone = viewState === "unavailable" ? "alarm" : viewState === "cached" || aging ? "advisory" : "accent";
-  const label = viewState === "unavailable" ? "無法確認" : viewState === "cached" ? "快取" : aging ? "建議更新" : "即時";
+  const tone: Tone = isLoading ? "unknown" : viewState === "unavailable" ? "alarm" : viewState === "cached" || aging ? "advisory" : "accent";
+  const label = isLoading
+    ? "更新中"
+    : expired
+      ? "已過期"
+      : viewState === "unavailable"
+        ? "無法確認"
+        : viewState === "cached"
+          ? "快取"
+          : aging
+            ? "建議更新"
+            : "即時";
   const title =
     viewState === "unavailable"
       ? "警特報來源無法確認"
@@ -360,18 +391,19 @@ function FreshnessPill({ result, isLoading, now }: { result: RiskDashboardLoadRe
 
 function DestinationPanel({
   state,
+  viewState,
   result,
   selectedCounty,
   selectedCountyName,
   onSelectCounty,
 }: {
   state: LoadState;
+  viewState: WarningViewState;
   result: RiskDashboardLoadResult | null;
   selectedCounty: CountyRisk | null;
   selectedCountyName: string;
   onSelectCounty: (countyName: string) => void;
 }) {
-  const viewState = warningViewState(result);
   const presentation =
     state.status === "loading" && !result
       ? {
@@ -576,7 +608,11 @@ function MapPanel({
       <ul className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2.5" aria-label="地圖圖例">
         {counts.map((item) => (
           <li key={item.status} className="flex items-start gap-2">
-            <span className={`mt-1 h-3.5 w-3.5 shrink-0 rounded-[3px] ${TONE_BAR[item.status]}`} aria-hidden="true" />
+            <span
+              className={`mt-1 h-3.5 w-3.5 shrink-0 rounded-[3px] ${TONE_BAR[item.status]}`}
+              style={item.status === "unknown" ? HATCH_STYLE : undefined}
+              aria-hidden="true"
+            />
             <span className="min-w-0 text-sm leading-5">
               <span className="font-bold">{item.label}</span>
               {snapshot ? <span className="tabular ml-1.5 text-muted">{item.count}</span> : null}
@@ -646,10 +682,17 @@ function EmptyState({ onRetry }: { onRetry: () => void }) {
   );
 }
 
-function StateBanner({ result, isRefreshing }: { result: RiskDashboardLoadResult | null; isRefreshing: boolean }) {
+function StateBanner({
+  result,
+  viewState,
+  isRefreshing,
+}: {
+  result: RiskDashboardLoadResult | null;
+  viewState: WarningViewState;
+  isRefreshing: boolean;
+}) {
   if (!result) return null;
 
-  const viewState = warningViewState(result);
   const failedSources = result.sources.filter((source) => source.status === "error").length;
   const staleSources = result.sources.filter((source) => source.stale).length;
 
@@ -746,7 +789,7 @@ function WarningSection({
 }
 
 function WarningGroupCard({ group, selectedCountyName }: { group: WarningGroup; selectedCountyName: string }) {
-  const counties = group.warnings.map((warning) => warning.countyName);
+  const counties = [...new Set(group.warnings.map((warning) => warning.countyName))];
   // Collapsed: two counties on phones, four on wider screens.
   const [expanded, setExpanded] = useState(group.warnings.length <= 2);
   const ordered = [...group.warnings].sort(
