@@ -48,56 +48,93 @@ export function countyMapStatus(county: CountyRisk, viewState: WarningViewState)
   return viewState === "cached" ? "unknown" : "calm";
 }
 
-export function countyWarningPresentation(county: CountyRisk | null, viewState: WarningViewState, countyName = county?.countyName) {
+export interface AnswerPresentation {
+  eyebrow: string;
+  /** Small text before the focal answer (usually the county name). */
+  lead?: string;
+  /** The single focal answer; segments are joined with a line-break hint. */
+  focal: string[];
+  /** Small text after the focal answer. */
+  tail?: string;
+  detail: string;
+  tone: Tone;
+}
+
+/** Accessible heading text: lead, focal and tail separated by spaces. */
+export function answerTitle(answer: AnswerPresentation): string {
+  return [answer.lead, answer.focal.join(""), answer.tail].filter(Boolean).join(" ");
+}
+
+export function countyWarningPresentation(
+  county: CountyRisk | null,
+  viewState: WarningViewState,
+  countyName = county?.countyName,
+): AnswerPresentation {
   if (viewState === "unavailable") {
     return {
       eyebrow: "警特報待確認",
-      title: countyName ? `無法確認 ${countyName} 現況` : "目前無法確認全台警特報",
-      detail: "警特報來源無法取得或資料時間偏舊。空資料不等於沒有警報，請直接到 CWA 官方頁確認。",
-      tone: "unknown" as Tone,
+      lead: countyName ? undefined : "目前",
+      focal: ["無法確認"],
+      tail: countyName ? `${countyName} 現況` : "全台警特報",
+      detail: "來源無法取得或資料過舊。空資料不等於沒有警報，請到 CWA 官方頁確認。",
+      tone: "alarm",
     };
   }
 
   if (viewState === "cached") {
-    return {
-      eyebrow: "時效內快取，不是即時確認",
-      title: !county
-        ? "目前僅有快取，先選目的地查看"
-        : county.warnings.length > 0
-          ? `${county.countyName} 快取仍列 ${county.warnings.length} 項警特報`
-          : `${county.countyName} 現況仍需確認`,
-      detail: !county
-        ? "選擇縣市後可查看最近快取；無論有無列出警報，現況仍請以官方頁為準。"
-        : county.warnings.length > 0
-          ? "最近快取仍保留有效警示；現況與後續更新請以官方頁為準。"
-          : "快取沒有列出警報，不足以證明現在沒有警報。請先查看官方最新資訊。",
-      tone: "advisory" as Tone,
-    };
+    if (!county) {
+      return {
+        eyebrow: "時效內快取，不是即時確認",
+        lead: "目前僅有快取，",
+        focal: [],
+        tail: "先選目的地查看",
+        detail: "選擇縣市可查看最近快取；現況請以官方頁為準。",
+        tone: "advisory",
+      };
+    }
+    return county.warnings.length > 0
+      ? {
+          eyebrow: "時效內快取，不是即時確認",
+          lead: county.countyName,
+          focal: ["快取仍列", ` ${county.warnings.length} 項警特報`],
+          detail: "最近快取仍列有效警示；現況請以官方頁為準。",
+          tone: "advisory",
+        }
+      : {
+          eyebrow: "時效內快取，不是即時確認",
+          lead: county.countyName,
+          focal: ["現況仍需確認"],
+          detail: "快取沒有列出警報，不足以證明現在沒有警報。",
+          tone: "advisory",
+        };
   }
 
   if (!county) {
     return {
       eyebrow: "先選目的地",
-      title: "選一個縣市查看",
-      detail: "用上方選單或點地圖。該縣市仍有效的官方警特報會排在最前面，並標示資料是即時、快取或無法確認。",
-      tone: "accent" as Tone,
+      lead: "選一個縣市查看",
+      focal: [],
+      detail: "用選單或點地圖選縣市，先看 CWA 警特報。",
+      tone: "accent",
     };
   }
 
   if (county.warnings.length > 0) {
     return {
       eyebrow: "CWA 有效警特報",
-      title: `${county.countyName} 有 ${county.warnings.length} 項警特報`,
-      detail: "以下是 CWA 列出的有效時間與細部影響範圍；完整內容請以官方公告為準。",
-      tone: county.warnings.some((warning) => warningTone(warning) === "alarm") ? ("alarm" as Tone) : ("advisory" as Tone),
+      lead: county.countyName,
+      focal: [`有 ${county.warnings.length} 項警特報`],
+      detail: "CWA 列出的有效時間與影響範圍如下，完整內容以官方公告為準。",
+      tone: county.warnings.some((warning) => warningTone(warning) === "alarm") ? "alarm" : "advisory",
     };
   }
 
   return {
     eyebrow: "CWA 警特報資料已取得",
-    title: `${county.countyName} 未列有效縣市警特報`,
-    detail: "這只代表截至本站直接取得時間，這份縣市警特報資料未列警示；不代表所有災害都安全，也不取代行程與交通判斷。",
-    tone: "calm" as Tone,
+    lead: county.countyName,
+    focal: ["未列有效", "縣市警特報"],
+    detail: "截至本站取得時間，CWA 未列該縣市的有效警特報；這不代表所有災害都安全。",
+    tone: "calm",
   };
 }
 

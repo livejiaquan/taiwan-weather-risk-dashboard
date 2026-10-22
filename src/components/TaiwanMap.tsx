@@ -42,7 +42,7 @@ export function TaiwanMap({
 
       <path d={COUNTY_INSET_BORDERS} fill="none" stroke="rgb(var(--line))" strokeWidth="1" strokeDasharray="3 3" />
       {COUNTY_SHAPES.filter((shape) => INSET_LABELS[shape.countyName]).map((shape) => (
-        <text key={shape.countyName} x={shape.bounds[0]} y={shape.bounds[1] - 6} className="fill-muted text-[10px] font-bold">
+        <text key={shape.countyName} x={shape.bounds[0]} y={shape.bounds[1] - 6} className="fill-muted text-xs font-bold">
           {INSET_LABELS[shape.countyName]}
         </text>
       ))}
