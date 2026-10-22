@@ -86,6 +86,16 @@ a {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Chinese headings break at punctuation and spaces rather than mid-word
+   (e.g. never split 目的地); anywhere-wrapping is only a last resort. */
+h1,
+h2,
+h3 {
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+}
+
 button:focus-visible,
 a:focus-visible,
 select:focus-visible,

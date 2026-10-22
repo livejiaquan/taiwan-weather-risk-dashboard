@@ -416,7 +416,7 @@ function DestinationPanel({
   return (
     <div className="flex min-w-0 flex-col gap-6">
       <div>
-        <h1 className="text-balance text-[1.75rem] font-black leading-snug tracking-tight sm:text-4xl lg:text-[2.6rem] lg:leading-[1.2]">
+        <h1 className="text-[clamp(1.5rem,7.2vw,1.75rem)] font-black leading-snug tracking-tight sm:text-4xl lg:text-[2.6rem] lg:leading-[1.2]">
           出門前，先看目的地的官方警特報
         </h1>
         <p className={`mt-3 max-w-xl text-base leading-7 text-muted ${selectedCountyName ? "hidden sm:block" : ""}`}>
@@ -455,7 +455,7 @@ function DestinationPanel({
         <div className={`h-1.5 ${TONE_BAR[presentation.tone]}`} aria-hidden="true" />
         <div className="p-5 sm:p-6">
           <p className={`text-sm font-bold ${TONE_TEXT[presentation.tone]}`}>{presentation.eyebrow}</p>
-          <h2 className="mt-1.5 text-balance text-2xl font-black leading-tight sm:text-3xl">{presentation.title}</h2>
+          <h2 className="mt-1.5 text-2xl font-black leading-tight sm:text-3xl">{presentation.title}</h2>
           <p className="mt-3 text-sm leading-6 text-muted">{presentation.detail}</p>
           {!selectedCountyName ? (
             // Always rendered (with interim text) so the card keeps its height.
