@@ -18,7 +18,34 @@
 | [Ventusky](https://www.ventusky.com/) | 自製 Canvas 2D ✓ | 全螢幕氣象場，警報是一個圖層 ✓ | 未驗證 | PWA ✓ | 「Updated …（next update …）」✓ |
 | 補充：[NCDR 災害情資網](https://watch.ncdr.nat.gov.tw/) | D3 v4 ✓ | 動態載入清單（未深入） | 未驗證 | RWD ✓ | 未驗證 |
 
-這次沒有深入調查 GitHub 上的開源專案。地圖幾何最後選用 [taiwan-atlas](https://github.com/dkaoster/taiwan-atlas)（MIT，源自內政部縣市界線開放資料）。
+## 每個產品拿來做什麼、哪些值得借鏡
+
+| 產品 | 使用者拿它做什麼 | 值得借鏡 | 本站 |
+| --- | --- | --- | --- |
+| CWA 警特報頁 | 查官方原文、各類警特報的完整內容 | 地圖與表格並列；同一類警特報集中說明 | 採用分組呈現；官方頁是每張卡片的最終出口 |
+| CWA App | 推播警特報、看自己所在地 | 推播與定位 | 不採用（延後項目，沒有證據前不做推播） |
+| JMA | 查全國到市町村的警報等級 | 等級色階與「発表なし」明寫；依現象與等級篩選 | 採用明寫「未列有效警特報」；篩選改成「依地區選縣市」 |
+| tenki.jp | 一般民眾看自己縣市的警報 | 「現在時刻」與「發表時刻」分開，用 `<time>` 標記 | 採用雙時間標示 |
+| NWS | 查美國各預報區的警報全文 | 同一區有多個警報時只畫最高等級 | 採用「取最高等級上色」；不採用 110 色事件色表 |
+| MeteoAlarm | 跨國比較歐洲各地警戒等級 | 全歐一致的四級色階；地圖、地區、詳情三層下鑽 | 採用「總覽 → 縣市 → 官方原文」三層 |
+| Windy | 看風場、雨量等氣象模型動畫 | 底部圖例、單一圖層一次只講一件事 | 採用圖例緊貼地圖；不採用動態氣象場 |
+| Zoom Earth | 看衛星雲圖、颱風路徑 | 服務中斷時主動告知 | 採用並擴大：失敗、快取、過期都有明確狀態 |
+| Ventusky | 看全球天氣模型 | 「Updated … next update …」 | 採用相對時間與「建議更新」提示 |
+| NCDR 災害情資網 | 防災人員看多源災害情資 | 多來源整合 | 不採用（本站刻意只做警特報，觀測只當脈絡） |
+
+## 開源實作與授權
+
+本站直接使用或參考的開源專案如下，授權都和本 repo 的 MIT 相容：
+
+| 專案 | 授權 | 用法 |
+| --- | --- | --- |
+| [taiwan-atlas](https://github.com/dkaoster/taiwan-atlas) | MIT | 縣市 TopoJSON 原始檔，放在 `scripts/data/`，授權全文在 `scripts/data/TAIWAN_ATLAS_LICENSE`。幾何源自內政部「直轄市、縣市界線」政府開放資料。 |
+| [topojson-client](https://github.com/topojson/topojson-client)、[topojson-simplify](https://github.com/topojson/topojson-simplify)、[d3-geo](https://github.com/d3/d3-geo) | ISC | 只在 `scripts/build-county-map.ts` 建置時使用，產出預先投影的 SVG path，不進入前端 bundle。 |
+| [Fontsource Barlow](https://fontsource.org/fonts/barlow) | OFL-1.1 | 自架 Barlow 的 Latin 子集，取代 Google Fonts 外部請求。 |
+| [Radix Colors](https://www.radix-ui.com/colors)、[shadcn/ui](https://ui.shadcn.com/) | MIT | 只參考做法，沒有複製程式碼：顏色依用途分層（背景、邊框、實色、文字），用語意化的 CSS 變數對應 Tailwind。 |
+| [lucide-react](https://lucide.dev/) | ISC | 原本就在使用的圖示。 |
+
+taiwan-atlas 是 [us-atlas](https://github.com/topojson/us-atlas) 的台灣版，做法相同。我們在它之上補了三件事：島嶼碎片過濾、離島 inset 的點擊範圍，以及把幾何資料從約 180 KiB 壓到約 30 KiB。
 
 ## 觀察
 

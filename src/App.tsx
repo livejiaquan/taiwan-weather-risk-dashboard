@@ -198,7 +198,7 @@ export function App() {
     <div className="min-h-screen bg-bg text-ink">
       <a
         href="#county-focus"
-        className="fixed left-4 top-4 z-50 -translate-y-24 rounded-lg bg-accent px-4 py-3 font-bold text-accent-ink transition-transform focus:translate-y-0"
+        className="fixed left-4 top-4 z-50 -translate-y-24 rounded-control bg-accent px-4 py-3 font-bold text-accent-ink transition-transform focus:translate-y-0"
       >
         跳到主要內容
       </a>
@@ -239,9 +239,7 @@ export function App() {
         </section>
 
         <div className="mt-8 flex flex-col gap-8 lg:mt-12 lg:gap-12">
-          {isLoading && !snapshot ? (
-            <LoadingState />
-          ) : state.status === "error" && !snapshot ? (
+          {isLoading && !snapshot ? null : state.status === "error" && !snapshot ? (
             <FatalState error={state.error} sources={state.data?.sources ?? []} onRetry={() => void load()} />
           ) : snapshot ? (
             <>
@@ -289,8 +287,8 @@ function SiteHeader({
 }) {
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-bg/90 backdrop-blur">
-      <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
-        <a href="./" className="flex min-w-0 items-center gap-2.5 rounded-lg" aria-label="出門前：台灣縣市警特報整理">
+      <div className="mx-auto flex h-[4.25rem] w-full max-w-7xl items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
+        <a href="./" className="flex min-w-0 items-center gap-2.5 rounded-control" aria-label="出門前：台灣縣市警特報整理">
           <BrandMark />
           <span className="min-w-0">
             <span className="block text-lg font-black leading-tight tracking-wide">出門前</span>
@@ -304,7 +302,7 @@ function SiteHeader({
             onClick={onRefresh}
             disabled={isLoading}
             aria-label={isLoading ? "正在更新資料" : "更新資料"}
-            className="grid h-10 w-10 place-items-center rounded-lg border border-line bg-surface text-ink transition hover:border-accent disabled:cursor-not-allowed disabled:opacity-60"
+            className="grid h-11 w-11 place-items-center rounded-control border border-line bg-surface text-ink transition hover:border-accent disabled:cursor-not-allowed disabled:opacity-60"
           >
             <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} aria-hidden="true" />
           </button>
@@ -312,7 +310,7 @@ function SiteHeader({
             type="button"
             onClick={onToggleTheme}
             aria-label={theme === "dark" ? "切換為淺色模式" : "切換為深色模式"}
-            className="grid h-10 w-10 place-items-center rounded-lg border border-line bg-surface text-ink transition hover:border-accent"
+            className="grid h-11 w-11 place-items-center rounded-control border border-line bg-surface text-ink transition hover:border-accent"
           >
             {theme === "dark" ? <Sun className="h-4 w-4" aria-hidden="true" /> : <Moon className="h-4 w-4" aria-hidden="true" />}
           </button>
@@ -345,7 +343,7 @@ function FreshnessPill({
 }) {
   if (!result) {
     return (
-      <span className="inline-flex h-10 items-center gap-2 rounded-lg border border-line bg-surface px-3 text-sm font-semibold text-muted">
+      <span className="inline-flex h-11 items-center gap-2 rounded-control border border-line bg-surface px-3 text-sm font-semibold text-muted">
         <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
         <span className="hidden sm:inline">{isLoading ? "連線 CWA" : "尚無資料"}</span>
       </span>
@@ -376,7 +374,7 @@ function FreshnessPill({
 
   return (
     <span
-      className={`inline-flex h-10 items-center gap-2 rounded-lg px-3 text-sm font-semibold ${TONE_CHIP[tone]}`}
+      className={`inline-flex h-11 items-center gap-2 rounded-control px-3 text-sm font-semibold ${TONE_CHIP[tone]}`}
       title={title}
       aria-label={`資料狀態：${label}${age !== null ? `，${formatAge(age)}` : ""}`}
     >
@@ -384,7 +382,7 @@ function FreshnessPill({
         {tone === "accent" ? <span className="absolute inset-0 animate-ping rounded-full bg-accent opacity-50" /> : null}
       </span>
       <span>{label}</span>
-      {age !== null ? <span className="tabular hidden font-medium opacity-80 sm:inline">{formatAge(age)}</span> : null}
+      {age !== null ? <span className="tabular hidden font-medium sm:inline">{formatAge(age)}</span> : null}
     </span>
   );
 }
@@ -418,10 +416,10 @@ function DestinationPanel({
   return (
     <div className="flex min-w-0 flex-col gap-6">
       <div>
-        <h1 className="text-[1.75rem] font-black leading-snug tracking-tight sm:text-4xl lg:text-[2.6rem] lg:leading-[1.2]">
+        <h1 className="text-balance text-[1.75rem] font-black leading-snug tracking-tight sm:text-4xl lg:text-[2.6rem] lg:leading-[1.2]">
           出門前，先看目的地的官方警特報
         </h1>
-        <p className={`mt-3 max-w-xl text-base leading-7 text-muted ${selectedCounty ? "hidden sm:block" : ""}`}>
+        <p className={`mt-3 max-w-xl text-base leading-7 text-muted ${selectedCountyName ? "hidden sm:block" : ""}`}>
           選一個縣市，查看中央氣象署目前列出的警特報、影響範圍與有效時間。雨量、風速、溫度另列為觀測脈絡。
         </p>
       </div>
@@ -436,7 +434,7 @@ function DestinationPanel({
             id="county-select"
             value={selectedCountyName}
             onChange={(event) => onSelectCounty(event.target.value)}
-            className="min-h-14 w-full appearance-none rounded-xl border border-line bg-surface py-3 pl-12 pr-11 text-lg font-bold text-ink outline-none transition focus:border-accent focus:ring-4 focus:ring-accent/20"
+            className="min-h-14 w-full appearance-none rounded-inner border border-line bg-surface py-3 pl-12 pr-11 text-lg font-bold text-ink outline-none transition focus:border-accent focus:ring-4 focus:ring-accent/20"
           >
             <option value="">選擇縣市</option>
             {REGIONS.map((region) => (
@@ -453,17 +451,28 @@ function DestinationPanel({
         </div>
       </div>
 
-      <article className="overflow-hidden rounded-2xl border border-line bg-surface" aria-live="polite">
+      <article className="overflow-hidden rounded-panel border border-line bg-surface" aria-live="polite">
         <div className={`h-1.5 ${TONE_BAR[presentation.tone]}`} aria-hidden="true" />
         <div className="p-5 sm:p-6">
           <p className={`text-sm font-bold ${TONE_TEXT[presentation.tone]}`}>{presentation.eyebrow}</p>
-          <h2 className="mt-1.5 text-2xl font-black leading-tight sm:text-3xl">{presentation.title}</h2>
+          <h2 className="mt-1.5 text-balance text-2xl font-black leading-tight sm:text-3xl">{presentation.title}</h2>
           <p className="mt-3 text-sm leading-6 text-muted">{presentation.detail}</p>
+          {!selectedCountyName ? (
+            // Always rendered (with interim text) so the card keeps its height.
+            <p className="tabular mt-4 rounded-inner bg-raised px-4 py-3 text-sm font-semibold">
+              {!result
+                ? "正在讀取全台警特報"
+                : !result.snapshot || viewState === "unavailable"
+                  ? "全台狀態待確認，請以 CWA 官方頁為準"
+                  : `${viewState === "cached" ? "快取資料：" : "目前："}全台 ${result.snapshot.national.activeWarningCountyCount} / ${COUNTIES.length} 個縣市列有警特報`}
+            </p>
+          ) : null}
+          {!result && state.status === "loading" ? <LoadingState withCounty={Boolean(selectedCountyName)} /> : null}
 
           {showWarnings.length > 0 ? (
             <ul className="mt-5 flex flex-col gap-3">
               {showWarnings.map((warning) => (
-                <li key={`${warning.phenomena}-${warning.startTime}`} className="rounded-xl bg-raised p-4">
+                <li key={`${warning.phenomena}-${warning.startTime}`} className="rounded-inner bg-raised p-4">
                   <div className="flex flex-wrap items-center gap-2">
                     <WarningChip warning={warning} />
                     <span className="tabular text-xs font-semibold text-muted">
@@ -492,7 +501,7 @@ function DestinationPanel({
               href={officialWarningUrl(showWarnings[0])}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-accent px-5 text-sm font-bold text-accent-ink transition hover:opacity-90"
+              className="inline-flex min-h-touch items-center justify-center gap-2 rounded-inner bg-accent px-5 text-sm font-bold text-accent-ink transition hover:opacity-90"
             >
               到 CWA 官方頁確認
               <ExternalLink className="h-4 w-4" aria-hidden="true" />
@@ -501,7 +510,9 @@ function DestinationPanel({
           </div>
         </div>
       </article>
-      <p className="-mt-3 text-xs leading-5 text-muted">本站是民間整理，不是政府官方服務；緊急狀況請依中央與地方政府發布資訊行動。</p>
+      {result ? (
+        <p className="-mt-3 text-xs leading-5 text-muted">本站是民間整理，不是政府官方服務；緊急狀況請依中央與地方政府發布資訊行動。</p>
+      ) : null}
     </div>
   );
 }
@@ -591,12 +602,15 @@ function MapPanel({
       : `${snapshot.national.activeWarningCountyCount} / ${COUNTIES.length} 縣市${viewState === "cached" ? "（快取）" : ""}列有警特報`;
 
   return (
-    <div className="flex min-w-0 flex-col rounded-2xl border border-line bg-surface p-4 sm:p-6">
+    // While the first load is pending the map is held back on phones, where it
+    // sits below the answer card and would be pushed down (layout shift) when
+    // the answer fills in.
+    <div className={`${isLoading ? "hidden lg:flex" : "flex"} min-w-0 flex-col rounded-panel border border-line bg-surface p-4 sm:p-6`}>
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <h2 className="text-lg font-black">全台縣市</h2>
         <p className="tabular text-sm font-semibold text-muted">{summary}</p>
       </div>
-      <div className="relative mx-auto mt-2 aspect-[360/520] w-full max-w-[26rem] rounded-xl bg-sea">
+      <div className="relative mx-auto mt-2 aspect-[360/520] w-full max-w-[26rem] rounded-inner bg-sea">
         <TaiwanMap
           statuses={statuses}
           selectedCountyName={selectedCountyName}
@@ -628,18 +642,27 @@ function MapPanel({
   );
 }
 
-function LoadingState() {
+/** Placeholder sized like the loaded answer so the card does not jump when data arrives. */
+function LoadingState({ withCounty }: { withCounty: boolean }) {
   return (
-    <section className="flex items-center justify-center gap-3 rounded-2xl border border-line bg-surface p-6 text-muted" aria-live="polite">
-      <Loader2 className="h-5 w-5 animate-spin text-accent" aria-hidden="true" />
-      正在整理 CWA 警特報與觀測資料
-    </section>
+    <div className="mt-5">
+      <p className="flex items-center gap-2 text-sm text-muted">
+        <Loader2 className="h-4 w-4 animate-spin text-accent" aria-hidden="true" />
+        正在整理 CWA 警特報與觀測資料
+      </p>
+      {withCounty ? (
+        <div aria-hidden="true">
+          <div className="mt-4 h-[5.5rem] animate-pulse rounded-inner bg-raised" />
+          <div className="mt-6 h-[6.5rem] animate-pulse rounded-inner bg-raised sm:h-[4.25rem]" />
+        </div>
+      ) : null}
+    </div>
   );
 }
 
 function FatalState({ error, sources, onRetry }: { error: string; sources: SourceStatus[]; onRetry: () => void }) {
   return (
-    <section className="overflow-hidden rounded-2xl border border-line bg-surface" aria-live="assertive">
+    <section className="overflow-hidden rounded-panel border border-line bg-surface" aria-live="assertive">
       <div className="h-1.5 bg-alarm" aria-hidden="true" />
       <div className="p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -657,7 +680,7 @@ function FatalState({ error, sources, onRetry }: { error: string; sources: Sourc
           <button
             type="button"
             onClick={() => onRetry()}
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-ink px-4 text-sm font-bold text-bg"
+            className="inline-flex min-h-touch items-center justify-center gap-2 rounded-inner bg-ink px-4 text-sm font-bold text-bg"
           >
             <RefreshCw className="h-4 w-4" aria-hidden="true" />
             重新讀取
@@ -671,10 +694,10 @@ function FatalState({ error, sources, onRetry }: { error: string; sources: Sourc
 
 function EmptyState({ onRetry }: { onRetry: () => void }) {
   return (
-    <section className="rounded-2xl border border-line bg-surface p-8 text-center">
+    <section className="rounded-panel border border-line bg-surface p-8 text-center">
       <h2 className="text-xl font-black">目前沒有可顯示的資料</h2>
       <p className="mt-2 text-muted">來源可能暫時沒有資料或網路連線中斷；這不代表目前沒有警特報。</p>
-      <button type="button" onClick={() => onRetry()} className="mt-5 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-ink px-4 text-sm font-bold text-bg">
+      <button type="button" onClick={() => onRetry()} className="mt-5 inline-flex min-h-touch items-center justify-center gap-2 rounded-inner bg-ink px-4 text-sm font-bold text-bg">
         <RefreshCw className="h-4 w-4" aria-hidden="true" />
         重新讀取
       </button>
@@ -723,7 +746,7 @@ function StateBanner({
   if (!banner) return null;
 
   return (
-    <div className={`flex items-start gap-3 rounded-xl px-4 py-3 text-sm leading-6 ${TONE_CHIP[banner.tone]}`} role="status">
+    <div className={`flex items-start gap-3 rounded-inner px-4 py-3 text-sm leading-6 ${TONE_CHIP[banner.tone]}`} role="status">
       <banner.icon className="mt-1 h-4 w-4 shrink-0" aria-hidden="true" />
       <div>
         <span className="font-bold">{banner.strong}</span>
@@ -798,7 +821,7 @@ function WarningGroupCard({ group, selectedCountyName }: { group: WarningGroup; 
   const visible = expanded ? ordered : ordered.slice(0, 4);
 
   return (
-    <article className="overflow-hidden rounded-2xl border border-line bg-surface">
+    <article className="overflow-hidden rounded-panel border border-line bg-surface">
       <div className="flex">
         <div className={`w-1.5 shrink-0 ${TONE_BAR[group.tone]}`} aria-hidden="true" />
         <div className="min-w-0 flex-1 p-5">
@@ -817,7 +840,7 @@ function WarningGroupCard({ group, selectedCountyName }: { group: WarningGroup; 
               href={officialWarningUrl(group.warnings[0])}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-line px-3 text-sm font-bold text-accent transition hover:border-accent"
+              className="inline-flex min-h-touch items-center gap-1.5 rounded-control border border-line px-3 text-sm font-bold text-accent transition hover:border-accent"
             >
               官方詳情 <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
             </a>
@@ -832,7 +855,7 @@ function WarningGroupCard({ group, selectedCountyName }: { group: WarningGroup; 
             {visible.map((warning, index) => (
               <li
                 key={`${warning.countyName}-${warning.startTime}`}
-                className={`rounded-xl px-4 py-3 ${warning.countyName === selectedCountyName ? "bg-accent-soft" : "bg-raised"} ${
+                className={`rounded-inner px-4 py-3 ${warning.countyName === selectedCountyName ? "bg-accent-soft" : "bg-raised"} ${
                   !expanded && index >= 2 ? "hidden md:block" : ""
                 }`}
               >
@@ -849,7 +872,7 @@ function WarningGroupCard({ group, selectedCountyName }: { group: WarningGroup; 
               type="button"
               onClick={() => setExpanded((value) => !value)}
               aria-expanded={expanded}
-              className={`mt-3 inline-flex min-h-10 items-center gap-1 rounded-lg px-2 text-sm font-bold text-accent ${
+              className={`mt-3 inline-flex min-h-touch items-center gap-1 rounded-control px-2 text-sm font-bold text-accent ${
                 group.warnings.length <= 4 && !expanded ? "md:hidden" : ""
               }`}
             >
@@ -882,7 +905,7 @@ function CountyIndex({
   return (
     <section aria-labelledby="county-index-title">
       <SectionHeading id="county-index-title" title="依地區選縣市" description="色塊與地圖相同；數字是該縣市目前列出的警特報項數。" />
-      <div className="divide-y divide-line rounded-2xl border border-line bg-surface">
+      <div className="divide-y divide-line rounded-panel border border-line bg-surface">
         {REGIONS.map((region) => (
           <div key={region} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:gap-6 sm:px-5">
             <h3 className="w-12 shrink-0 text-sm font-bold text-muted">{REGION_LABELS[region]}</h3>
@@ -898,14 +921,14 @@ function CountyIndex({
                       type="button"
                       aria-pressed={selected}
                       onClick={() => selectAndReveal(county.countyName)}
-                      className={`inline-flex min-h-10 items-center gap-2 rounded-lg border px-3 text-sm font-bold transition ${
+                      className={`inline-flex min-h-touch items-center gap-2 rounded-control border px-3 text-sm font-bold transition ${
                         selected ? "border-ink bg-ink text-bg" : "border-line bg-surface hover:border-accent"
                       }`}
                     >
                       <span className={`h-2.5 w-2.5 rounded-sm ${TONE_BAR[status]}`} aria-hidden="true" />
                       {county.countyName}
                       {county.warnings.length > 0 && status !== "unknown" ? (
-                        <span className="tabular text-xs font-semibold opacity-70">
+                        <span className="tabular text-xs font-semibold">
                           {county.warnings.length}
                           <span className="sr-only"> 項警特報</span>
                         </span>
@@ -938,7 +961,7 @@ function ObservationSection({ snapshot, result }: { snapshot: RiskSnapshot; resu
           title="全台測站觀測"
           description="自動測站的當下數值，只是出門前的脈絡；不等於官方判定，也不合成安全分數。"
         />
-        <dl className="grid gap-px overflow-hidden rounded-2xl border border-line bg-line sm:grid-cols-2">
+        <dl className="grid gap-px overflow-hidden rounded-panel border border-line bg-line sm:grid-cols-2">
           {rows.map((row) => (
             <div key={row.label} className="bg-surface p-4 sm:p-5">
               <dt className="flex items-center gap-2 text-sm font-semibold text-muted">
@@ -960,7 +983,7 @@ function ObservationSection({ snapshot, result }: { snapshot: RiskSnapshot; resu
 
       <div>
         <SectionHeading id="records-title" title="近期紀錄" description="已發生的事件與區域資料，不納入目的地警特報判斷。" />
-        <dl className="divide-y divide-line rounded-2xl border border-line bg-surface">
+        <dl className="divide-y divide-line rounded-panel border border-line bg-surface">
           <div className="p-4 sm:p-5">
             <dt className="text-sm font-semibold text-muted">區域熱帶氣旋</dt>
             <dd className="mt-1 font-bold">
@@ -997,7 +1020,7 @@ function SourceFooter({ sources }: { sources: SourceStatus[] }) {
             <li>來源失敗、資料過期或只有快取時，本站不下「沒有警報」的結論。</li>
             <li>地圖邊界：taiwan-atlas，源自內政部國土測繪中心開放資料。</li>
           </ul>
-          <a href="https://opendata.cwa.gov.tw/" target="_blank" rel="noreferrer" className="mt-4 inline-flex min-h-10 items-center gap-2 font-bold text-accent underline underline-offset-4">
+          <a href="https://opendata.cwa.gov.tw/" target="_blank" rel="noreferrer" className="mt-4 inline-flex min-h-touch items-center gap-2 font-bold text-accent underline underline-offset-4">
             CWA 開放資料平臺
             <ExternalLink className="h-4 w-4" aria-hidden="true" />
           </a>
@@ -1010,7 +1033,7 @@ function SourceFooter({ sources }: { sources: SourceStatus[] }) {
 
 function SourceList({ sources }: { sources: SourceStatus[] }) {
   return (
-    <ul className="mt-4 divide-y divide-line rounded-2xl border border-line bg-surface lg:mt-0">
+    <ul className="mt-4 divide-y divide-line rounded-panel border border-line bg-surface lg:mt-0">
       {sources.map((source) => {
         const status = sourceDisplay(source);
         return (
@@ -1052,7 +1075,7 @@ function SectionHeading({ id, title, description }: { id: string; title: string;
 
 function Notice({ tone, children }: { tone: Tone; children: ReactNode }) {
   return (
-    <div className={`flex items-start gap-3 rounded-xl px-4 py-3 text-sm leading-6 ${TONE_CHIP[tone]}`}>
+    <div className={`flex items-start gap-3 rounded-inner px-4 py-3 text-sm leading-6 ${TONE_CHIP[tone]}`}>
       <Clock3 className="mt-1 h-4 w-4 shrink-0" aria-hidden="true" />
       <div>{children}</div>
     </div>

@@ -10,7 +10,26 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ["Barlow", "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", "ui-sans-serif", "system-ui", "sans-serif"],
+        // Barlow (self-hosted, Latin subset) sets digits and Latin; Chinese falls
+        // through to the platform's own CJK face, so no multi-MB webfont loads.
+        sans: ["Barlow", "PingFang TC", "Noto Sans TC", "Noto Sans CJK TC", "Microsoft JhengHei", "ui-sans-serif", "system-ui", "sans-serif"],
+      },
+      // Radius encodes hierarchy: controls < inner blocks < panels.
+      borderRadius: {
+        control: "0.5rem",
+        inner: "0.75rem",
+        panel: "1rem",
+      },
+      transitionDuration: {
+        DEFAULT: "160ms",
+        fast: "120ms",
+        slow: "320ms",
+      },
+      transitionTimingFunction: {
+        DEFAULT: "cubic-bezier(0.2, 0, 0, 1)",
+      },
+      minHeight: {
+        touch: "2.75rem",
       },
       colors: {
         bg: token("bg"),

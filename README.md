@@ -33,7 +33,7 @@
 - 深色／淺色模式（預設跟隨系統，可手動切換）。
 - Loading、empty、partial、cached、fatal 與 responsive desktop/mobile 狀態。
 
-介面設計依據與同類產品調查見 [`docs/design-research.md`](./docs/design-research.md)。
+設計依據：使用者研究 [`docs/ux-research.md`](./docs/ux-research.md)、同類產品調查 [`docs/design-research.md`](./docs/design-research.md)、設計語言 [`docs/design-system.md`](./docs/design-system.md)。
 
 ## 資料來源與語義
 
