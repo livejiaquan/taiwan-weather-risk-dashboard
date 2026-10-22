@@ -1,41 +1,49 @@
 import type { Config } from "tailwindcss";
 
+// Colors are CSS variables (RGB channels) defined in src/index.css so light and
+// dark themes share one set of semantic names.
+const token = (name: string) => `rgb(var(--${name}) / <alpha-value>)`;
+
 export default {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
+  darkMode: "class",
   theme: {
     extend: {
       fontFamily: {
-        sans: ["Inter", "Noto Sans TC", "ui-sans-serif", "system-ui", "sans-serif"],
+        // Barlow (self-hosted, Latin subset) sets digits and Latin; Chinese falls
+        // through to the platform's own CJK face, so no multi-MB webfont loads.
+        sans: ["Barlow", "PingFang TC", "Noto Sans TC", "Noto Sans CJK TC", "Microsoft JhengHei", "ui-sans-serif", "system-ui", "sans-serif"],
+      },
+      // Radius encodes hierarchy: controls < inner blocks < panels.
+      borderRadius: {
+        control: "0.5rem",
+        inner: "0.75rem",
+        panel: "1rem",
+      },
+      transitionDuration: {
+        DEFAULT: "160ms",
+        fast: "120ms",
+        slow: "320ms",
+      },
+      transitionTimingFunction: {
+        DEFAULT: "cubic-bezier(0.2, 0, 0, 1)",
+      },
+      minHeight: {
+        touch: "2.75rem",
       },
       colors: {
-        ink: "#10211C",
-        paper: "#F6F7F2",
-        line: "#C8D3CA",
-        teal: {
-          50: "#E8F4F1",
-          100: "#D0E8E2",
-          600: "#0F766E",
-          700: "#0B5F59",
-          800: "#084C47",
-          900: "#063C38",
-        },
-        cobalt: {
-          50: "#EEF4FF",
-          100: "#D9E7FF",
-          600: "#2563EB",
-          700: "#1D4ED8",
-          800: "#1E40AF",
-        },
-        sky: {
-          50: "#F0F9FF",
-          100: "#E0F2FE",
-          600: "#0284C7",
-          700: "#0369A1",
-        },
-      },
-      boxShadow: {
-        soft: "0 18px 45px -30px rgba(16, 33, 28, 0.32)",
-        card: "0 10px 25px -22px rgba(16, 33, 28, 0.28)",
+        bg: token("bg"),
+        surface: token("surface"),
+        raised: token("raised"),
+        ink: token("ink"),
+        muted: token("muted"),
+        line: token("line"),
+        accent: { DEFAULT: token("accent"), ink: token("accent-ink"), soft: token("accent-soft") },
+        alarm: { DEFAULT: token("alarm"), ink: token("alarm-ink"), soft: token("alarm-soft") },
+        advisory: { DEFAULT: token("advisory"), ink: token("advisory-ink"), soft: token("advisory-soft") },
+        calm: { DEFAULT: token("calm"), ink: token("calm-ink") },
+        unknown: { DEFAULT: token("unknown"), ink: token("unknown-ink") },
+        sea: token("sea"),
       },
     },
   },

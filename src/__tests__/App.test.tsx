@@ -163,11 +163,42 @@ function deferred<T>() {
 describe("App trust-first warning contract", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Fixtures were fetched at 00:30 Taipei time; pin "now" a few minutes later
+    // so the UI's 90-minute trust window treats them as fresh.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-05-30T00:35:00+08:00"));
     window.history.replaceState(null, "", "/");
   });
 
   afterEach(() => {
     cleanup();
+    vi.useRealTimers();
+  });
+
+  it("fails closed when the last live confirmation is older than the trust window", async () => {
+    vi.setSystemTime(new Date("2026-05-30T02:05:00+08:00"));
+    window.history.replaceState(null, "", "/?county=臺北市");
+    arrangeResult(makeCurrentResult());
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "無法確認 臺北市 現況" })).toBeInTheDocument();
+    expect(screen.getByText(/警特報狀態待確認/)).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "臺北市 未列有效縣市警特報" })).not.toBeInTheDocument();
+  });
+
+  it("counts distinct counties when one county has two warnings of the same kind", async () => {
+    const base = { countyName: "臺北市", geocode: "63", phenomena: "大雨", significance: "特報", affectedAreas: ["山區"] };
+    arrangeResult(
+      makeCurrentResult([
+        { ...base, startTime: "2026-05-30T00:00:00+08:00", endTime: "2026-05-30T02:00:00+08:00" },
+        { ...base, startTime: "2026-05-30T00:20:00+08:00", endTime: "2026-05-30T03:00:00+08:00" },
+      ]),
+    );
+
+    render(<App />);
+
+    expect(await screen.findByText("1 個縣市：臺北市")).toBeInTheDocument();
   });
 
   it("provides a keyboard skip link to the destination warning check", () => {
