@@ -74,6 +74,6 @@ The product never declares a place safe. Official warnings, observations, and si
 
 - Additional hazards or agencies.
 - Push notifications, PWA background delivery, or accounts.
-- A map-first redesign.
+- A map-first redesign. (2026-10-22: a county map was added as an overview and second way to pick a destination; the destination answer stays first.)
 - A new composite risk score or score calibration.
 - Custom-domain configuration without a chosen domain and DNS authority.
