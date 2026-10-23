@@ -41,6 +41,8 @@
   --none: 201 207 213;
   /* Text on solid level cells. */
   --on-alarm: 255 255 255;
+  /* Brand-mark accent: orange-red, the same in both themes. */
+  --mark: 194 77 41;
   --on-advisory: 0 0 0;
 }
 
@@ -71,6 +73,7 @@
   --rule: 84 102 118;
   --none: 44 58 70;
   --on-alarm: 11 21 30;
+  --mark: 194 77 41;
   --on-advisory: 11 21 30;
 }
 

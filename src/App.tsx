@@ -1,5 +1,6 @@
 import {
   AlertTriangle,
+  CloudLightning,
   ChevronDown,
   Clock3,
   ExternalLink,
@@ -311,11 +312,11 @@ function SiteHeader({
     // A solid brand bar with divided items, after the JMA navigation bar.
     <header className="sticky top-0 z-40 bg-brand text-white shadow-[0_1px_3px_rgb(211_214_221)] dark:shadow-none">
       <div className="flex h-12 items-stretch lg:h-[52px]">
-        <a href="./" className="flex min-w-0 items-center gap-2 px-3 lg:px-4" aria-label="出門前：台灣縣市警特報整理">
+        <a href="./" className="flex min-w-0 items-center gap-[10px] px-3 lg:px-4" aria-label="出門前：台灣縣市警特報整理">
           <BrandMark />
           <span className="min-w-0">
-            <h1 className="text-lg font-bold leading-tight">出門前</h1>
-            <span className="hidden text-xs leading-tight text-white/90 sm:block">台灣縣市警特報整理</span>
+            <h1 className="text-base font-semibold leading-tight tracking-[-0.01em]">出門前</h1>
+            <span className="hidden text-xs font-medium leading-tight text-white/90 sm:block">台灣縣市警特報整理</span>
           </span>
         </a>
         <a
@@ -336,7 +337,7 @@ function SiteHeader({
             aria-label={isLoading ? "正在更新資料" : "更新資料"}
             className="grid h-11 w-11 place-items-center rounded-control bg-white/15 text-white transition hover:bg-white/25 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            <RefreshCw className={`h-5 w-5 ${isLoading ? "animate-spin" : ""}`} aria-hidden="true" />
+            <RefreshCw strokeWidth={1.75} className={`h-5 w-5 ${isLoading ? "animate-spin" : ""}`} aria-hidden="true" />
           </button>
           <button
             type="button"
@@ -344,7 +345,7 @@ function SiteHeader({
             aria-label={theme === "dark" ? "切換為淺色模式" : "切換為深色模式"}
             className="grid h-11 w-11 place-items-center rounded-control bg-white/15 text-white transition hover:bg-white/25"
           >
-            {theme === "dark" ? <Sun className="h-5 w-5" aria-hidden="true" /> : <Moon className="h-5 w-5" aria-hidden="true" />}
+            {theme === "dark" ? <Sun strokeWidth={1.75} className="h-5 w-5" aria-hidden="true" /> : <Moon strokeWidth={1.75} className="h-5 w-5" aria-hidden="true" />}
           </button>
         </div>
       </div>
@@ -352,13 +353,15 @@ function SiteHeader({
   );
 }
 
+/**
+ * The brand mark shared with public/brand/mark.svg: a rounded square (22% radius)
+ * in the site accent holding one white Lucide icon at 58% of its side.
+ */
 function BrandMark() {
   return (
-    <svg viewBox="0 0 32 32" className="h-8 w-8 shrink-0" aria-hidden="true">
-      <rect width="32" height="32" rx="6" fill="#fff" />
-      <path d="M19.5 5.5c2.6 1.4 3.4 4.6 2.7 8.3-.7 3.8-2.6 8.7-5.6 12.2-.6.7-1.7.5-1.9-.4-.8-3-2.6-5.5-4-8-1.5-2.8-.9-6.5 1.5-9.3 2-2.3 5-3.8 7.3-2.8Z" className="fill-advisory" />
-      <path d="M17.8 9.5c1.2.8 1.4 2.6.9 4.5-.5 2-1.6 4.3-2.8 5.7-1-1.8-2.2-3.4-2.6-5.1-.5-2.4 2.3-6.3 4.5-5.1Z" className="fill-alarm" />
-    </svg>
+    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[22%] bg-mark" aria-hidden="true">
+      <CloudLightning className="h-[58%] w-[58%] text-white" strokeWidth={2} />
+    </span>
   );
 }
 
@@ -394,7 +397,7 @@ function FreshnessPill({
       title={title}
       aria-label={`資料狀態：${label}${tier === "fresh" && age !== null ? `，${formatAge(age)}` : ""}`}
     >
-      {isLoading || !result ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
+      {isLoading || !result ? <Loader2 strokeWidth={1.75} className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
       <span className={isLoading || !result ? "hidden sm:inline" : ""}>{label}</span>
       {tier === "fresh" && age !== null && !isLoading ? <span className="tabular hidden font-medium sm:inline">{formatAge(age)}</span> : null}
     </span>
@@ -435,7 +438,7 @@ function Breadcrumb({ selectedCountyName, onSelectCounty }: { selectedCountyName
             </optgroup>
           ))}
         </select>
-        <ChevronDown className="pointer-events-none absolute right-3 h-5 w-5 text-ink" aria-hidden="true" />
+        <ChevronDown strokeWidth={1.75} className="pointer-events-none absolute right-3 h-5 w-5 text-ink" aria-hidden="true" />
       </div>
       <p className="ml-4 hidden items-center text-sm text-muted sm:flex" aria-hidden="true">
         今天要去哪裡？
@@ -584,7 +587,7 @@ function AnswerTable({
           className="inline-flex min-h-touch items-center justify-center gap-2 rounded-control bg-brand px-5 text-base font-bold text-white transition hover:opacity-90"
         >
           到 CWA 官方頁確認
-          <ExternalLink className="h-4 w-4" aria-hidden="true" />
+          <ExternalLink strokeWidth={1.75} className="h-5 w-5" aria-hidden="true" />
         </a>
         <WarningTimes result={result} isLoading={state.status === "loading"} />
       </div>
@@ -860,7 +863,7 @@ function LoadingState({ withCounty }: { withCounty: boolean }) {
   return (
     <div className="mt-4">
       <p className="flex items-center gap-2 text-base text-muted">
-        <Loader2 className="h-4 w-4 animate-spin text-accent" aria-hidden="true" />
+        <Loader2 strokeWidth={1.75} className="h-4 w-4 animate-spin text-accent" aria-hidden="true" />
         正在整理 CWA 警特報與觀測資料
       </p>
       {withCounty ? (
@@ -877,7 +880,7 @@ function FatalState({ error, sources, onRetry }: { error: string; sources: Sourc
   return (
     <section className="border border-rule bg-surface" aria-live="assertive">
       <div className="flex min-h-9 items-center gap-2 bg-alarm px-3 py-1 text-on-alarm">
-        <AlertTriangle className="h-5 w-5" aria-hidden="true" />
+        <AlertTriangle strokeWidth={1.75} className="h-5 w-5" aria-hidden="true" />
         <h2 className="text-base font-bold">目前無法確認官方警特報</h2>
       </div>
       <div className="flex flex-col gap-4 px-4 py-4 sm:flex-row sm:items-start sm:justify-between">
@@ -885,7 +888,7 @@ function FatalState({ error, sources, onRetry }: { error: string; sources: Sourc
           <p className="text-base text-muted">{error}</p>
           <a href={OFFICIAL_WARNING_URL} target="_blank" rel="noreferrer" className="mt-2 inline-flex min-h-touch items-center gap-2 text-base font-bold text-accent underline underline-offset-4">
             直接查看 CWA 官方警特報
-            <ExternalLink className="h-4 w-4" aria-hidden="true" />
+            <ExternalLink strokeWidth={1.75} className="h-4 w-4" aria-hidden="true" />
           </a>
         </div>
         <button
@@ -893,7 +896,7 @@ function FatalState({ error, sources, onRetry }: { error: string; sources: Sourc
           onClick={() => onRetry()}
           className="inline-flex min-h-touch items-center justify-center gap-2 rounded-control bg-brand px-4 text-base font-bold text-white"
         >
-          <RefreshCw className="h-4 w-4" aria-hidden="true" />
+          <RefreshCw strokeWidth={1.75} className="h-5 w-5" aria-hidden="true" />
           重新讀取
         </button>
       </div>
@@ -909,7 +912,7 @@ function EmptyState({ onRetry }: { onRetry: () => void }) {
       <div className="px-4 py-4">
         <p className="text-base text-muted">來源可能暫時沒有資料或網路連線中斷；這不代表目前沒有警特報。</p>
         <button type="button" onClick={() => onRetry()} className="mt-4 inline-flex min-h-touch items-center justify-center gap-2 rounded-control bg-brand px-4 text-base font-bold text-white">
-          <RefreshCw className="h-4 w-4" aria-hidden="true" />
+          <RefreshCw strokeWidth={1.75} className="h-5 w-5" aria-hidden="true" />
           重新讀取
         </button>
       </div>
@@ -945,7 +948,7 @@ function StateBanner({
             tone: "advisory" as Tone,
             icon: Clock3,
             strong: "這是 24 小時前的資料。",
-            body: ` GitHub 排程延遲，最後成功更新 ${dataTime ? formatDateTime(dataTime) : "時間未提供"}；要看最新請到 CWA 官方網站。`,
+            body: ` 自動更新排程延遲，最後成功更新 ${dataTime ? formatDateTime(dataTime) : "時間未提供"}；要看最新請到 CWA 官方網站。`,
           }
         : result.degraded || isRefreshing
           ? {
@@ -963,7 +966,7 @@ function StateBanner({
 
   return (
     <div className={`flex items-start gap-3 border border-rule px-4 py-3 text-base ${TONE_CHIP[banner.tone]}`} role="status">
-      <banner.icon className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
+      <banner.icon strokeWidth={1.75} className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
       <div>
         <span className="font-bold">{banner.strong}</span>
         {banner.body}
@@ -1048,7 +1051,7 @@ function WarningGroupRows({ group, selectedCountyName }: { group: WarningGroup; 
             rel="noreferrer"
             className="inline-flex min-h-touch items-center gap-2 rounded-control border border-rule bg-surface px-3 text-sm font-bold text-accent"
           >
-            官方詳情 <ExternalLink className="h-4 w-4" aria-hidden="true" />
+            官方詳情 <ExternalLink strokeWidth={1.75} className="h-4 w-4" aria-hidden="true" />
           </a>
         </div>
       </div>
@@ -1140,7 +1143,7 @@ function SourceFooter({ sources }: { sources: SourceStatus[] }) {
         </ul>
         <a href="https://opendata.cwa.gov.tw/" target="_blank" rel="noreferrer" className="mt-2 inline-flex min-h-touch items-center gap-2 font-bold text-accent underline underline-offset-4">
           CWA 開放資料平臺
-          <ExternalLink className="h-4 w-4" aria-hidden="true" />
+          <ExternalLink strokeWidth={1.75} className="h-4 w-4" aria-hidden="true" />
         </a>
       </div>
       <SourceList sources={sources} />
@@ -1182,7 +1185,7 @@ function SourceList({ sources }: { sources: SourceStatus[] }) {
 function Notice({ tone, children }: { tone: Tone; children: ReactNode }) {
   return (
     <div className={`flex items-start gap-3 border-t border-rule px-4 py-3 text-base ${TONE_CHIP[tone]}`}>
-      <Clock3 className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
+      <Clock3 strokeWidth={1.75} className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
       <div>{children}</div>
     </div>
   );
