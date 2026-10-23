@@ -1,5 +1,13 @@
 {
   "name": "taiwan-weather-risk-dashboard",
+  "description": "Taiwan county-level view of active CWA weather warnings, with data-age labelling and a fail-safe design.",
+  "author": "Lim Jia Quan",
+  "license": "MIT",
+  "homepage": "https://livejiaquan.github.io/taiwan-weather-risk-dashboard/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/livejiaquan/taiwan-weather-risk-dashboard.git"
+  },
   "version": "0.1.0",
   "private": true,
   "type": "module",

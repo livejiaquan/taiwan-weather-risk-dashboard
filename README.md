@@ -16,7 +16,7 @@
 - 這是官方警特報、觀測脈絡，還是本站整理？
 - 我下一步應該做什麼，去哪裡確認官方原文？
 
-使命、外部研究、替代方案與 roadmap 見 [`PRODUCT_STRATEGY.md`](./PRODUCT_STRATEGY.md)。
+產品定位與外部研究見 [`docs/PRODUCT_STRATEGY.md`](./docs/PRODUCT_STRATEGY.md)，技術決策見 [`docs/DECISIONS.md`](./docs/DECISIONS.md)。
 
 ## 目前功能
 
@@ -27,13 +27,17 @@
 - 警特報來源失敗時 fail closed，不把空資料解讀成無警報。
 - 雨量、風速與溫度另列為 CWA 觀測脈絡。
 - 地震報告與區域熱帶氣旋另列為近期紀錄，不納入目前天氣警報判斷。
-- 全台縣市警特報地圖：依 CWA 的「警報」「特報」字詞上色；「未列」用中性色而非綠色，快取或無法確認時整張地圖加斜線。
+- 全台縣市警特報地圖：依 CWA 的「警報」「特報」字詞上色；「未列」用中性色而非綠色，資料超過 24 小時或無法確認時整張地圖加斜線。
 - 警特報依種類分組（例如「陸上強風特報：全台 22 個縣市」），逐縣市保留影響範圍與有效時間。
-- 頁首資料狀態燈號（即時／快取／無法確認／建議更新）與相對時間；頁面開著超過 30 分鐘會提示更新。
+- 答案旁標示資料時間與相對時間，依資料年齡分段（見下方「資料時效」）。
 - 深色／淺色模式（預設跟隨系統，可手動切換）。
 - Loading、empty、partial、cached、fatal 與 responsive desktop/mobile 狀態。
 
-設計依據：使用者研究 [`docs/ux-research.md`](./docs/ux-research.md)、同類產品調查 [`docs/design-research.md`](./docs/design-research.md)、設計語言 [`docs/design-system.md`](./docs/design-system.md)。
+![桌面版](./docs/screenshots/desktop-1440-light.png)
+
+![手機版](./docs/screenshots/mobile-390-light.png)
+
+設計取捨見 [`docs/design.md`](./docs/design.md)。
 
 ## 資料來源與語義
 
@@ -116,6 +120,20 @@ GitHub Actions 排程只作 best-effort fallback：排程可能延遲或漏跑�
 - 已選定網域的 DNS、HTTPS、rollback 與維護責任驗證。
 
 Repository 內目前沒有網域、DNS 或外部監控 credential；不可把 sample/mock 或過期 cache 當 production fallback。
+
+## 專案結構
+
+```text
+src/            React 應用程式（App.tsx 為畫面；lib/ 為 CWA 資料載入、驗證與呈現邏輯）
+scripts/        資料快取產生、部署新鮮度檢查、縣市地圖建置
+tests/          部署與公開中繼資料的測試
+public/         靜態資產與 data/latest.json 警特報快照
+docs/           設計筆記、技術決策與維運手冊
+```
+
+## 授權
+
+[MIT](./LICENSE)。縣市地圖幾何來自 taiwan-atlas（MIT，授權全文在 `scripts/data/TAIWAN_ATLAS_LICENSE`）；CWA 資料依政府資料開放授權條款使用。
 
 ## 已知限制
 
