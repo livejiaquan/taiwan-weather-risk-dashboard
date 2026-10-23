@@ -63,8 +63,8 @@ export function TaiwanMap({
               d={shape.d}
               className="county-shape"
               fill={FILL[status]}
-              stroke="rgb(var(--surface))"
-              strokeWidth={isInset ? 0.6 : 0.9}
+              stroke="rgb(var(--rule))"
+              strokeWidth={isInset ? 0.4 : 0.6}
               strokeLinejoin="round"
             />
             {hatched ? <path d={shape.d} fill="url(#map-hatch)" pointerEvents="none" /> : null}
