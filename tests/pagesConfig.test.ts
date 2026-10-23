@@ -29,7 +29,8 @@ describe("GitHub Pages workflow", () => {
 
   it("runs the best-effort schedule away from minute zero", () => {
     expect(workflow).toMatch(/best-effort/i);
-    expect(workflow).toMatch(/cron:\s+["']17,47 \* \* \* \*["']/);
+    expect(workflow).toMatch(/cron:\s+["']7,22,37,52 \* \* \* \*["']/);
+    expect(workflow).toMatch(/workflow_dispatch:/);
     expect(workflow).not.toMatch(/cron:\s+["'][^"']*\b0\b[^"']*["']/);
   });
 

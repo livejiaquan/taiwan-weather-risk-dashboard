@@ -298,7 +298,7 @@ function compareCountyWarnings(a: CountyRisk, b: CountyRisk): number {
     COUNTIES.findIndex((county) => county.countyName === b.countyName);
 }
 
-function isWarningEffectiveAt(warning: WeatherWarning, reference: string): boolean {
+export function isWarningEffectiveAt(warning: WeatherWarning, reference: string): boolean {
   const referenceTime = new Date(reference).getTime();
   if (!Number.isFinite(referenceTime)) return false;
 

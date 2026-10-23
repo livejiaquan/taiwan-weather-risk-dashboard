@@ -108,10 +108,15 @@ describe("deployment freshness probe", () => {
     });
   });
 
-  it("rejects a cache older than the 90-minute product budget", () => {
+  it("accepts a snapshot from a normally delayed schedule run", () => {
+    expect(checkDeploymentFreshness(cacheDocument("2026-08-24T08:00:00Z"), now).ageMinutes).toBe(240);
+  });
+
+  it("rejects a cache older than the six-hour aging band", () => {
+    expect(checkDeploymentFreshness(cacheDocument("2026-08-24T06:00:00Z"), now).ageMinutes).toBe(360);
     expect(() =>
-      checkDeploymentFreshness(cacheDocument("2026-08-24T10:29:59Z"), now),
-    ).toThrow(/older than 90 minutes/);
+      checkDeploymentFreshness(cacheDocument("2026-08-24T05:59:59Z"), now),
+    ).toThrow(/older than 6 hours/);
   });
 
   it("rejects any future cache timestamp because the browser cannot use it", () => {

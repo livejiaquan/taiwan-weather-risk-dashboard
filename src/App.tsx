@@ -3,7 +3,6 @@ import {
   ChevronDown,
   Clock3,
   CloudRain,
-  Database,
   ExternalLink,
   Info,
   Loader2,
@@ -25,11 +24,12 @@ import {
 } from "./lib/cwaClient";
 import {
   OFFICIAL_WARNING_URL,
-  REFRESH_SUGGESTED_AFTER_MINUTES,
   actionForWarning,
   answerTitle,
   countyMapStatus,
   countyWarningPresentation,
+  dataAgeTier,
+  dataTimeLabel,
   formatAge,
   formatDateTime,
   formatMetric,
@@ -38,10 +38,11 @@ import {
   minutesSince,
   officialWarningUrl,
   sourceDisplay,
+  snapshotEffectiveAt,
   sourceSummary,
   warningTone,
-  warningViewState,
   warningViewStateAt,
+  warningDataTime,
   type AnswerPresentation,
   type MapCountyStatus,
   type Tone,
@@ -194,8 +195,13 @@ export function App() {
     return () => window.removeEventListener("popstate", syncCountyFromUrl);
   }, []);
 
-  const snapshot = state.data?.snapshot ?? null;
   const viewState = warningViewStateAt(state.data, now);
+  // Warnings whose own CWA validity ended since the snapshot was taken drop out here.
+  const effective = useMemo(
+    () => (state.data?.snapshot ? snapshotEffectiveAt(state.data.snapshot, now) : null),
+    [state.data, now],
+  );
+  const snapshot = effective?.snapshot ?? null;
   const selectedCounty = snapshot?.counties.find((county) => county.countyName === selectedCountyName) ?? null;
   const isLoading = state.status === "loading";
 
@@ -247,6 +253,9 @@ export function App() {
             state={state}
             viewState={viewState}
             statuses={mapStatuses}
+            snapshot={snapshot}
+            endedCount={effective?.endedCount ?? 0}
+            now={now}
             result={state.data}
             selectedCounty={selectedCounty}
             selectedCountyName={selectedCountyName}
@@ -370,39 +379,25 @@ function FreshnessPill({
     );
   }
 
-  const sourceState = warningViewState(result);
-  const confirmedAt = sourceState === "cached" ? result.warnings.cacheGeneratedAt : result.warnings.fetchedAt;
-  const age = minutesSince(confirmedAt, now);
-  const expired = viewState === "unavailable" && sourceState !== "unavailable";
-  const aging = viewState === "current" && age !== null && age >= REFRESH_SUGGESTED_AFTER_MINUTES;
-  const tone: Tone = isLoading ? "unknown" : viewState === "unavailable" ? "alarm" : viewState === "cached" || aging ? "advisory" : "accent";
-  const label = isLoading
-    ? "更新中"
-    : expired
-      ? "已過期"
-      : viewState === "unavailable"
-        ? "無法確認"
-        : viewState === "cached"
-          ? "快取"
-          : aging
-            ? "建議更新"
-            : "即時";
-  const title =
-    viewState === "unavailable"
-      ? "警特報來源無法確認"
-      : `${viewState === "cached" ? "快取建立" : "本站取得"}：${confirmedAt ? formatDateTime(confirmedAt) : "未提供"}`;
+  const dataTime = viewState === "unavailable" ? undefined : warningDataTime(result);
+  const age = minutesSince(dataTime, now);
+  const tier = age === null ? null : dataAgeTier(age);
+  // Age is a label, not an alarm: amber once data is past 90 minutes, red only when nothing loads.
+  const tone: Tone = isLoading ? "unknown" : tier === null ? "alarm" : tier === "fresh" ? "accent" : "advisory";
+  const label = isLoading ? "更新中" : tier === null ? "無法取得資料" : tier === "fresh" ? "即時" : formatAge(age ?? 0);
+  const title = dataTime ? `資料時間：${formatDateTime(dataTime)}` : "目前取不到 CWA 警特報資料";
 
   return (
     <span
       className={`inline-flex h-11 items-center gap-2 rounded-control px-3 text-sm font-semibold ${TONE_CHIP[tone]}`}
       title={title}
-      aria-label={`資料狀態：${label}${age !== null ? `，${formatAge(age)}` : ""}`}
+      aria-label={`資料狀態：${label}${tier === "fresh" && age !== null ? `，${formatAge(age)}` : ""}`}
     >
       <span className={`relative h-2 w-2 rounded-full ${TONE_BAR[tone]}`} aria-hidden="true">
         {tone === "accent" ? <span className="absolute inset-0 animate-ping rounded-full bg-accent opacity-50" /> : null}
       </span>
       <span>{label}</span>
-      {age !== null ? <span className="tabular hidden font-medium sm:inline">{formatAge(age)}</span> : null}
+      {tier === "fresh" && age !== null ? <span className="tabular hidden font-medium sm:inline">{formatAge(age)}</span> : null}
     </span>
   );
 }
@@ -411,6 +406,9 @@ function DestinationPanel({
   state,
   viewState,
   statuses,
+  snapshot,
+  endedCount,
+  now,
   result,
   selectedCounty,
   selectedCountyName,
@@ -419,6 +417,9 @@ function DestinationPanel({
   state: LoadState;
   viewState: WarningViewState;
   statuses: Record<string, MapCountyStatus>;
+  snapshot: RiskSnapshot | null;
+  endedCount: number;
+  now: number;
   result: RiskDashboardLoadResult | null;
   selectedCounty: CountyRisk | null;
   selectedCountyName: string;
@@ -491,7 +492,14 @@ function DestinationPanel({
               </Fragment>
             ))}
           </h2>
-          {!selectedCountyName ? <NationalFigure result={result} viewState={viewState} /> : null}
+          {!selectedCountyName ? <NationalFigure result={result} snapshot={snapshot} viewState={viewState} /> : null}
+          <DataAgeNote
+            result={result}
+            viewState={viewState}
+            now={now}
+            showsWarnings={selectedCountyName ? showWarnings.length > 0 : (snapshot?.national.activeWarningCountyCount ?? 0) > 0}
+            endedCount={endedCount}
+          />
           <p className="mt-4 max-w-xl text-base text-muted">{answer.detail}</p>
 
           <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center">
@@ -513,9 +521,9 @@ function DestinationPanel({
       <div className="min-w-0">
         {!result && state.status === "loading" ? (
           <LoadingState withCounty={Boolean(selectedCountyName)} />
-        ) : !selectedCountyName && result?.snapshot ? (
+        ) : !selectedCountyName && snapshot ? (
           <CountyIndex
-            counties={result.snapshot.counties}
+            counties={snapshot.counties}
             statuses={statuses}
             selectedCountyName={selectedCountyName}
             onSelectCounty={onSelectCounty}
@@ -557,8 +565,15 @@ function DestinationPanel({
 }
 
 /** With no destination chosen, the nationwide count is the answer. */
-function NationalFigure({ result, viewState }: { result: RiskDashboardLoadResult | null; viewState: WarningViewState }) {
-  const snapshot = result?.snapshot;
+function NationalFigure({
+  result,
+  snapshot,
+  viewState,
+}: {
+  result: RiskDashboardLoadResult | null;
+  snapshot: RiskSnapshot | null;
+  viewState: WarningViewState;
+}) {
   if (!snapshot || viewState === "unavailable") {
     // Rendered with interim text so the block keeps its height while loading.
     return (
@@ -573,9 +588,51 @@ function NationalFigure({ result, viewState }: { result: RiskDashboardLoadResult
     <p className="tabular mt-6">
       <span className={`text-4xl font-black lg:text-5xl ${TONE_FOCAL[tone]}`}>{snapshot.national.activeWarningCountyCount}</span>
       <span className="ml-2 text-xl font-bold">
-        / {COUNTIES.length} 縣市{viewState === "cached" ? "（快取）" : ""}列有警特報
+        / {COUNTIES.length} 縣市列有警特報
       </span>
     </p>
+  );
+}
+
+/**
+ * The data-time label beside the answer. Age only changes this label (amber past
+ * 90 minutes); the answer itself stays visible until the data is 24 hours old.
+ */
+function DataAgeNote({
+  result,
+  viewState,
+  now,
+  showsWarnings,
+  endedCount,
+}: {
+  result: RiskDashboardLoadResult | null;
+  viewState: WarningViewState;
+  now: number;
+  showsWarnings: boolean;
+  endedCount: number;
+}) {
+  const dataTime = viewState === "unavailable" ? undefined : warningDataTime(result);
+  const age = minutesSince(dataTime, now);
+  if (!dataTime || age === null) return null;
+  const tier = dataAgeTier(age);
+
+  return (
+    <div className="mt-4 text-base">
+      <p className={`tabular font-semibold ${tier === "fresh" ? "text-muted" : "text-advisory-ink"}`}>{dataTimeLabel(dataTime, now)}</p>
+      {tier !== "fresh" && tier !== "expired" && showsWarnings ? (
+        <p className="text-muted">這些警特報仍在 CWA 標示的有效期間內。</p>
+      ) : null}
+      {endedCount > 0 ? <p className="text-muted">另有 {endedCount} 項已在資料時間之後到期，未列入。</p> : null}
+      {tier === "old" || tier === "expired" ? (
+        <p className="text-muted">
+          本站每 3–4 小時更新一次，最新數據請見{" "}
+          <a href={OFFICIAL_WARNING_URL} target="_blank" rel="noreferrer" className="font-semibold text-accent underline underline-offset-4">
+            CWA 官方警特報
+          </a>
+          。
+        </p>
+      ) : null}
+    </div>
   );
 }
 
@@ -640,12 +697,12 @@ function MapSection({
   const describe = (countyName: string) => {
     const county = snapshot?.counties.find((candidate) => candidate.countyName === countyName);
     if (!county || viewState === "unavailable") return `${countyName}：待確認`;
-    if (county.warnings.length === 0) return viewState === "cached" ? `${countyName}：快取未列，待確認` : `${countyName}：未列有效警特報`;
+    if (county.warnings.length === 0) return viewState === "expired" ? `${countyName}：資料超過 24 小時，待確認` : `${countyName}：未列有效警特報`;
     return `${countyName}：${county.warnings.map((warning) => `${warning.phenomena}${warning.significance}`).join("、")}`;
   };
   const summary = !snapshot || viewState === "unavailable"
     ? "全台狀態待確認"
-    : `${snapshot.national.activeWarningCountyCount} / ${COUNTIES.length} 縣市${viewState === "cached" ? "（快取）" : ""}列有警特報`;
+    : `${snapshot.national.activeWarningCountyCount} / ${COUNTIES.length} 縣市${viewState === "expired" ? "（24 小時前的資料）" : ""}列有警特報`;
 
   return (
     <section aria-labelledby="map-title" className="grid gap-8 lg:grid-cols-2">
@@ -769,6 +826,7 @@ function StateBanner({
 }) {
   if (!result) return null;
 
+  const dataTime = warningDataTime(result);
   const failedSources = result.sources.filter((source) => source.status === "error").length;
   const staleSources = result.sources.filter((source) => source.stale).length;
 
@@ -780,18 +838,21 @@ function StateBanner({
           strong: "警特報狀態待確認。",
           body: "來源無法取得或資料時間偏舊，因此頁面不會顯示「安全」或「無警報」結論。請先查看 CWA 官方頁。",
         }
-      : viewState === "cached"
+      : viewState === "expired"
         ? {
             tone: "advisory" as Tone,
-            icon: Database,
-            strong: "目前顯示時效內快取。",
-            body: "快取可保留最近警示，但「快取未列警報」不能證明現在沒有警報；請到官方頁確認。",
+            icon: Clock3,
+            strong: "這是 24 小時前的資料。",
+            body: ` GitHub 排程延遲，最後成功更新 ${dataTime ? formatDateTime(dataTime) : "時間未提供"}；要看最新請到 CWA 官方網站。`,
           }
         : result.degraded || isRefreshing
           ? {
-              tone: "advisory" as Tone,
+              tone: "calm" as Tone,
               icon: Info,
-              strong: "警特報來源已直接取得；其他觀測資料可能不完整。",
+              strong:
+                result.warnings.coverage === "cached"
+                  ? "目前顯示本站快照；即時來源暫時取不到。"
+                  : "警特報來源已直接取得；其他觀測資料可能不完整。",
               body: isRefreshing ? " 正在背景更新。" : ` ${failedSources} 個來源失敗，${staleSources} 個來源時間偏舊。`,
             }
           : null;
@@ -833,7 +894,7 @@ function WarningSection({
     <section aria-labelledby="warning-section-title">
       <SectionHeading
         id="warning-section-title"
-        title={warningState === "cached" ? "快取中的有效警特報" : "官方有效警特報"}
+        title={warningState === "expired" ? "最後一筆資料中的警特報" : "官方有效警特報"}
         description="依警特報種類整理；同一種警特報在各縣市的影響範圍可能不同。"
       />
       <p className="tabular -mt-2 mb-6 text-sm text-muted">
@@ -848,10 +909,10 @@ function WarningSection({
       {warningState === "unavailable" ? (
         <Notice tone="alarm">目前無法確認官方警特報資料；頁面不會把空資料解讀成沒有警報。</Notice>
       ) : groups.length === 0 ? (
-        warningState === "cached" ? (
-          <Notice tone="advisory">時效內快取沒有列出有效警特報，但快取空白不能證明目前沒有警報，請到 CWA 官方頁確認。</Notice>
+        warningState === "expired" ? (
+          <Notice tone="advisory">24 小時前的資料沒有列出有效警特報，但這不能代表現在沒有警報，請到 CWA 官方頁確認。</Notice>
         ) : (
-          <Notice tone="calm">截至上方標示的本站直接取得時間，這份 CWA 縣市警特報資料未列出仍有效的警示。這不是對其他災害或行程安全的保證。</Notice>
+          <Notice tone="calm">截至資料時間，這份 CWA 縣市警特報資料未列出仍有效的警示。這不是對其他災害或行程安全的保證。</Notice>
         )
       ) : (
         <div className="flex flex-col gap-12">

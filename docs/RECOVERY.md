@@ -1,6 +1,6 @@
 # Freshness incident recovery
 
-This runbook covers failures from the independent **Check deployment freshness** workflow. The probe requests the deployed `data/latest.json` with a cache-busting query, retries one transient HTTP 5xx response, rejects persistent HTTP/JSON errors, requires a successful warning source, reuses the 22-county warning-schema validator, and fails when `generatedAt` is older than 90 minutes or more than 5 minutes in the future. A failed probe requests one `pages.yml` recovery run while preserving the failed freshness check as an alert; if a Pages run is already queued or in progress, it reuses that run instead of dispatching a duplicate that could cancel it through the workflow concurrency policy. If GitHub cannot report active runs, the guard fails closed without dispatching an unverified duplicate and the freshness alert is still preserved. Recovery still uses the normal validation and last-known-good safeguards.
+This runbook covers failures from the independent **Check deployment freshness** workflow. The probe requests the deployed `data/latest.json` with a cache-busting query, retries one transient HTTP 5xx response, rejects persistent HTTP/JSON errors, requires a successful warning source, reuses the 22-county warning-schema validator, and fails when `generatedAt` is older than 6 hours (the end of the site's "aging" band; GitHub schedules routinely run 3–4 hours apart) or more than 5 minutes in the future. A failed probe requests one `pages.yml` recovery run while preserving the failed freshness check as an alert; if a Pages run is already queued or in progress, it reuses that run instead of dispatching a duplicate that could cancel it through the workflow concurrency policy. If GitHub cannot report active runs, the guard fails closed without dispatching an unverified duplicate and the freshness alert is still preserved. Recovery still uses the normal validation and last-known-good safeguards.
 
 ## 1. Confirm the incident
 
@@ -30,7 +30,7 @@ npm run probe:freshness
 
 Do not hand-edit timestamps, weaken the 22-county validator, or publish sample/mock data to make the probe green.
 
-If CWA is temporarily unavailable and the deployed cache exceeds 90 minutes, leave the dashboard fail-closed and wait for a validated refresh. A stale cache is context for diagnosis, not current-warning truth.
+If CWA is temporarily unavailable, the site keeps showing the last validated snapshot with its age. Past 24 hours the page stops drawing conclusions from it on its own; wait for a validated refresh rather than hand-editing the cache.
 
 ## 3. Roll back a bad code deployment
 
@@ -58,5 +58,5 @@ For a persistent incident, record:
 - first failing probe time and run URL;
 - latest successful Pages run and deployed commit;
 - CWA warning endpoint status/error;
-- whether the site is fail-closed or serving a cache within 90 minutes;
+- which data-age band the site shows (fresh ≤ 90 min, aging ≤ 6 h, old ≤ 24 h, or past 24 h with no conclusion);
 - recovery/revert commit and post-recovery probe result.
