@@ -10,15 +10,14 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        // Barlow (self-hosted, Latin subset) sets digits and Latin; Chinese falls
-        // through to the platform's own CJK face, so no multi-MB webfont loads.
-        sans: ["Barlow", "PingFang TC", "Noto Sans TC", "Noto Sans CJK TC", "Microsoft JhengHei", "ui-sans-serif", "system-ui", "sans-serif"],
+        // System fonts, as on the JMA reference page (docs/references/tokens.md).
+        sans: ["-apple-system", "system-ui", "Segoe UI", "Roboto", "Helvetica Neue", "PingFang TC", "Noto Sans TC", "Noto Sans CJK TC", "Microsoft JhengHei", "sans-serif"],
       },
       // The only type sizes allowed (px): 12 / 14 / 16 / 18 / 22 / 28 / 36 / 48 / 64.
       fontSize: {
         xs: ["0.75rem", { lineHeight: "1.5" }],
         sm: ["0.875rem", { lineHeight: "1.6" }],
-        base: ["1rem", { lineHeight: "1.75" }],
+        base: ["1rem", { lineHeight: "1.5" }],
         lg: ["1.125rem", { lineHeight: "1.6" }],
         xl: ["1.375rem", { lineHeight: "1.4" }],
         "2xl": ["1.75rem", { lineHeight: "1.3" }],
@@ -28,7 +27,7 @@ export default {
       },
       // Radius encodes hierarchy: controls < inner blocks < panels.
       borderRadius: {
-        control: "0.5rem",
+        control: "0.25rem",
         inner: "0.75rem",
         panel: "1rem",
       },
@@ -56,6 +55,12 @@ export default {
         calm: { DEFAULT: token("calm"), ink: token("calm-ink") },
         unknown: { DEFAULT: token("unknown"), ink: token("unknown-ink") },
         sea: token("sea"),
+        brand: token("brand"),
+        band: token("band"),
+        rule: token("rule"),
+        none: token("none"),
+        "on-alarm": token("on-alarm"),
+        "on-advisory": token("on-advisory"),
       },
     },
   },

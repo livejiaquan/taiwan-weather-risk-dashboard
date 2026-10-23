@@ -14,9 +14,9 @@
  */
 :root {
   color-scheme: light;
-  --bg: 236 241 244;
+  --bg: 255 255 255;
   --surface: 255 255 255;
-  --raised: 245 248 250;
+  --raised: 243 246 249;
   --ink: 15 30 43;
   --muted: 79 95 109;
   --line: 208 218 225;
@@ -26,14 +26,22 @@
   --alarm: 200 38 61;
   --alarm-ink: 158 22 44;
   --alarm-soft: 252 230 233;
-  --advisory: 204 122 10;
+  --advisory: 191 112 9;
   --advisory-ink: 122 69 0;
   --advisory-soft: 254 240 214;
-  --calm: 125 146 161;
+  --calm: 116 137 154;
   --calm-ink: 52 69 84;
   --unknown: 157 169 178;
   --unknown-ink: 84 94 102;
-  --sea: 244 247 249;
+  --sea: 234 242 252;
+  /* Layout tokens borrowed from the JMA warning page structure (see docs/references/tokens.md). */
+  --brand: 22 84 156;
+  --band: 220 235 249;
+  --rule: 58 70 80;
+  --none: 201 207 213;
+  /* Text on solid level cells. */
+  --on-alarm: 255 255 255;
+  --on-advisory: 0 0 0;
 }
 
 :root.dark {
@@ -57,7 +65,13 @@
   --calm-ink: 186 202 214;
   --unknown: 94 107 117;
   --unknown-ink: 170 180 188;
-  --sea: 12 24 34;
+  --sea: 19 38 58;
+  --brand: 28 70 122;
+  --band: 26 44 64;
+  --rule: 84 102 118;
+  --none: 44 58 70;
+  --on-alarm: 11 21 30;
+  --on-advisory: 11 21 30;
 }
 
 * {
@@ -74,7 +88,7 @@ body {
   margin: 0;
   background: rgb(var(--bg));
   color: rgb(var(--ink));
-  font-family: "Barlow", "PingFang TC", "Noto Sans TC", "Noto Sans CJK TC", "Microsoft JhengHei", ui-sans-serif, system-ui, sans-serif;
+  font-family: -apple-system, system-ui, "Segoe UI", Roboto, "Helvetica Neue", "PingFang TC", "Noto Sans TC", "Noto Sans CJK TC", "Microsoft JhengHei", sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;

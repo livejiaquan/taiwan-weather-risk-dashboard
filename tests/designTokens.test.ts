@@ -46,6 +46,10 @@ const TEXT_PAIRS = [
   ["advisory-ink", "surface"],
   ["calm-ink", "raised"],
   ["unknown-ink", "raised"],
+  ["on-alarm", "alarm"],
+  ["on-advisory", "advisory"],
+  ["muted", "band"],
+  ["ink", "band"],
 ] as const;
 
 // Map fills are essential graphics (WCAG 1.4.11, 3:1) against the map background.
