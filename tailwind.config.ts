@@ -59,6 +59,7 @@ export default {
         band: token("band"),
         rule: token("rule"),
         none: token("none"),
+        mark: token("mark"),
         "on-alarm": token("on-alarm"),
         "on-advisory": token("on-advisory"),
       },
