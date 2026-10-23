@@ -34,7 +34,7 @@
   --unknown: 157 169 178;
   --unknown-ink: 84 94 102;
   --sea: 234 242 252;
-  /* Layout tokens borrowed from the JMA warning page structure (see docs/references/tokens.md). */
+  /* Layout tokens borrowed from the JMA warning page structure (see docs/design.md). */
   --brand: 22 84 156;
   --band: 220 235 249;
   --rule: 58 70 80;

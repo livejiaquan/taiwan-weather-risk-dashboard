@@ -231,7 +231,7 @@ export function App() {
         onToggleTheme={toggleTheme}
       />
 
-      {/* JMA rhythm: left-aligned page, a wide list column and a narrow map column (docs/references/tokens.md). */}
+      {/* Layout rhythm: left-aligned page, a wide list column and a narrow map column (docs/design.md). */}
       <main className={PAGE}>
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1043px)_320px] lg:items-start">
           <section id="county-focus" tabIndex={-1} aria-label="目的地警特報" className="min-w-0 focus:outline-none">

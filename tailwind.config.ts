@@ -10,7 +10,7 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        // System fonts, as on the JMA reference page (docs/references/tokens.md).
+        // System fonts; no webfont is loaded (see docs/design.md).
         sans: ["-apple-system", "system-ui", "Segoe UI", "Roboto", "Helvetica Neue", "PingFang TC", "Noto Sans TC", "Noto Sans CJK TC", "Microsoft JhengHei", "sans-serif"],
       },
       // The only type sizes allowed (px): 12 / 14 / 16 / 18 / 22 / 28 / 36 / 48 / 64.
