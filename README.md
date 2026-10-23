@@ -23,7 +23,7 @@
 - 縣市一次選擇與可分享的 `?county=` URL。
 - 目前有效的縣市警特報、affected areas、開始與結束時間。
 - 警報資料的 `live`、`cache`、`unavailable` 狀態與逐來源時間。
-- 90 分鐘快取上限；無效、未來或過期快取拒絕採用。
+- 資料時間在瀏覽器端依資料本身的時間計算，分四段標示（見下方「資料時效」）；無效、未來或超過 7 天的快照拒絕採用。
 - 警特報來源失敗時 fail closed，不把空資料解讀成無警報。
 - 雨量、風速與溫度另列為 CWA 觀測脈絡。
 - 地震報告與區域熱帶氣旋另列為近期紀錄，不納入目前天氣警報判斷。
@@ -87,13 +87,26 @@ npm run fetch:data
 
 腳本會產生 `public/data/latest.json`。這份 fallback **只保存完整的縣市警特報**，不再打包數千筆雨量站、氣象站、地震或熱帶氣旋 raw records；觀測脈絡只由瀏覽器的 live path 取得。Artifact 有 64 KiB raw 上限測試，目前真實產物約 6 KiB。
 
-應用程式會先用 90 分鐘內的 cache 快速首繪，隨即要求 CWA live sources 並在成功後取代畫面；live 失敗時才保留時效內 cache。Cache 中有警報時仍明示為快取；cache 沒有警報時不得推論現況沒有警報。
+應用程式會先用 cache 快速首繪，隨即要求 CWA live sources，並在成功後取代畫面；live 失敗時才保留 cache。
+
+### 資料時效
+
+GitHub 排程實際約 3–4 小時才跑一次，所以時效門檻是依實際能做到的頻率訂定，而不是依 cron 的設定。資料時間的算法：live 是本站取得時間，cache 是快照建立時間。年齡由瀏覽器即時計算，頁面一直開著也會跟著變老。
+
+| 資料時間 | 畫面 |
+| --- | --- |
+| ≤ 90 分鐘 | 即時；答案旁以中性色標「資料時間 HH:MM · N 分鐘前」 |
+| ≤ 6 小時 | 答案與地圖照常顯示，時間標示改成琥珀色；若有警特報，註明它們仍在 CWA 標示的有效期間內 |
+| ≤ 24 小時 | 同上，再加一行「本站每 3–4 小時更新一次」並附上官方連結 |
+| > 24 小時 | 仍顯示最後一筆資料，但不下結論（「無法確認」）、地圖加斜線，頂部加一條說明 |
+
+每項警特報都會在當下時間重新套用它自己的 CWA 有效期間，已經到期的會移除並註明。
 
 Warning cache 只有在完整覆蓋 22 縣市、縣市名稱與代碼一致，且 hazard／有效時間／影響區域 schema 可解析時才會被採用或覆蓋部署產物。Generator 每次 request 有 8 秒 timeout，只對 network、timeout 或 HTTP 5xx 重試一次；warning 仍失敗時不寫入、不 rename，保留 last-known-good artifact。
 
 GitHub Actions 排程只作 best-effort fallback：排程可能延遲或漏跑，因此不是警示更新 SLA，也不應是長期正式部署的唯一 ingestion path。Build／deploy job 分別設 15／10 分鐘上限，避免上游或 runner 無界等待。
 
-獨立的 `freshness.yml` 會錯開部署排程，從公開 Pages URL 重新下載 artifact；它會檢查 HTTP/JSON、90 分鐘時效、未來時間、warning source 狀態與完整 22 縣市 schema。可在本機執行 `npm run probe:freshness`；失敗診斷、重跑與 rollback 步驟見 [`docs/RECOVERY.md`](./docs/RECOVERY.md)。
+獨立的 `freshness.yml` 會錯開部署排程，從公開 Pages URL 重新下載 artifact；它會檢查 HTTP/JSON、6 小時時效（超過就離開「稍舊」區間）、未來時間、warning source 狀態與完整 22 縣市 schema。可在本機執行 `npm run probe:freshness`；失敗診斷、重跑與 rollback 步驟見 [`docs/RECOVERY.md`](./docs/RECOVERY.md)。
 
 ## 部署
 

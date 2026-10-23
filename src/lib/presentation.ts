@@ -1,7 +1,14 @@
 import type { RiskDashboardLoadResult, SourceStatus } from "./cwaClient";
-import type { CountyRisk, WeatherWarning } from "./riskEngine";
+import { isWarningEffectiveAt, type CountyRisk, type RiskSnapshot, type WeatherWarning } from "./riskEngine";
 
-export type WarningViewState = "current" | "cached" | "unavailable";
+/**
+ * current     — warning data is at most 24 hours old (live or the static snapshot)
+ * expired     — the last snapshot is older than 24 hours: shown, but no conclusion
+ * unavailable — no usable warning data at all
+ */
+export type WarningViewState = "current" | "expired" | "unavailable";
+/** Age bands of the warning data, measured in the browser from the data's own time. */
+export type DataAgeTier = "fresh" | "aging" | "old" | "expired";
 export type MapCountyStatus = "alarm" | "advisory" | "calm" | "unknown";
 export type Tone = "alarm" | "advisory" | "calm" | "unknown" | "accent";
 
@@ -10,29 +17,63 @@ const OFFICIAL_RAIN_WARNING_URL = "https://www.cwa.gov.tw/V8/C/P/Warning/W26.htm
 const OFFICIAL_WIND_WARNING_URL = "https://www.cwa.gov.tw/V8/C/P/Warning/W25.html";
 const OFFICIAL_TYPHOON_URL = "https://www.cwa.gov.tw/V8/C/P/Typhoon/TY_NEWS.html";
 
-/** Data older than this while the page stays open is flagged as worth refreshing. */
-export const REFRESH_SUGGESTED_AFTER_MINUTES = 30;
+// GitHub's scheduled refresh runs every 3–4 hours in practice, so the bands
+// follow what the pipeline can deliver rather than the cron setting.
+export const FRESH_MAX_MINUTES = 90;
+export const AGING_MAX_MINUTES = 6 * 60;
+export const USABLE_MAX_MINUTES = 24 * 60;
 
-export function warningViewState(result: RiskDashboardLoadResult | null): WarningViewState {
-  if (!result || result.warnings.currentness !== "current") return "unavailable";
-  if (result.warnings.coverage === "current") return "current";
-  if (result.warnings.coverage === "cached") return "cached";
-  return "unavailable";
+export function dataAgeTier(minutes: number): DataAgeTier {
+  if (minutes <= FRESH_MAX_MINUTES) return "fresh";
+  if (minutes <= AGING_MAX_MINUTES) return "aging";
+  if (minutes <= USABLE_MAX_MINUTES) return "old";
+  return "expired";
 }
 
-/** Matches the static cache budget in cwaClient: older warning data is not trusted. */
-export const WARNING_TRUST_WINDOW_MINUTES = 90;
+/** When this warning data was taken from CWA: the live fetch, or the snapshot build. */
+export function warningDataTime(result: RiskDashboardLoadResult | null): string | undefined {
+  if (!result) return undefined;
+  return result.warnings.coverage === "cached" ? result.warnings.cacheGeneratedAt : result.warnings.fetchedAt;
+}
+
+/** Whether the load produced trustworthy warning data, ignoring its age. */
+export function warningViewState(result: RiskDashboardLoadResult | null): "current" | "unavailable" {
+  if (!result || result.warnings.currentness !== "current" || result.warnings.coverage === "unavailable") return "unavailable";
+  return "current";
+}
 
 /**
- * Like warningViewState, but also expires trust as the page stays open: once the
- * last confirmation is older than the trust window, the page fails closed.
+ * Like warningViewState, but ages the data in the browser so a page left open
+ * (or a delayed snapshot) moves through the bands; past 24 hours it fails closed.
  */
 export function warningViewStateAt(result: RiskDashboardLoadResult | null, now: number): WarningViewState {
-  const base = warningViewState(result);
-  if (!result || base === "unavailable") return "unavailable";
-  const confirmedAt = base === "cached" ? result.warnings.cacheGeneratedAt : result.warnings.fetchedAt;
-  const age = minutesSince(confirmedAt, now);
-  return age === null || age > WARNING_TRUST_WINDOW_MINUTES ? "unavailable" : base;
+  if (warningViewState(result) === "unavailable") return "unavailable";
+  const age = minutesSince(warningDataTime(result), now);
+  if (age === null) return "unavailable";
+  return dataAgeTier(age) === "expired" ? "expired" : "current";
+}
+
+/**
+ * Re-applies each warning's own CWA validity window at `now`, so a warning that
+ * ended after the snapshot was taken is no longer shown as active.
+ */
+export function snapshotEffectiveAt(snapshot: RiskSnapshot, now: number): { snapshot: RiskSnapshot; endedCount: number } {
+  const reference = new Date(now).toISOString();
+  let endedCount = 0;
+  const counties = snapshot.counties.map((county) => {
+    const warnings = county.warnings.filter((warning) => isWarningEffectiveAt(warning, reference));
+    endedCount += county.warnings.length - warnings.length;
+    return warnings.length === county.warnings.length ? county : { ...county, warnings };
+  });
+  if (endedCount === 0) return { snapshot, endedCount };
+  return {
+    snapshot: {
+      ...snapshot,
+      counties,
+      national: { ...snapshot.national, activeWarningCountyCount: counties.filter((county) => county.warnings.length > 0).length },
+    },
+    endedCount,
+  };
 }
 
 /** CWA's own significance word decides the tone; this is not a site risk score. */
@@ -44,8 +85,8 @@ export function countyMapStatus(county: CountyRisk, viewState: WarningViewState)
   if (viewState === "unavailable") return "unknown";
   if (county.warnings.some((warning) => warningTone(warning) === "alarm")) return "alarm";
   if (county.warnings.length > 0) return "advisory";
-  // An empty cache cannot show that a county has no warning.
-  return viewState === "cached" ? "unknown" : "calm";
+  // Data older than 24 hours cannot show that a county has no warning.
+  return viewState === "expired" ? "unknown" : "calm";
 }
 
 export interface AnswerPresentation {
@@ -76,37 +117,21 @@ export function countyWarningPresentation(
       lead: countyName ? undefined : "目前",
       focal: ["無法確認"],
       tail: countyName ? `${countyName} 現況` : "全台警特報",
-      detail: "來源無法取得或資料過舊。空資料不等於沒有警報，請到 CWA 官方頁確認。",
-      tone: "alarm",
+      detail: "目前取不到 CWA 警特報資料。空資料不等於沒有警報，請到 CWA 官方頁確認。",
+      tone: "unknown",
     };
   }
 
-  if (viewState === "cached") {
-    if (!county) {
-      return {
-        eyebrow: "時效內快取，不是即時確認",
-        lead: "目前僅有快取，",
-        focal: [],
-        tail: "先選目的地查看",
-        detail: "選擇縣市可查看最近快取；現況請以官方頁為準。",
-        tone: "advisory",
-      };
-    }
-    return county.warnings.length > 0
-      ? {
-          eyebrow: "時效內快取，不是即時確認",
-          lead: county.countyName,
-          focal: ["快取仍列", ` ${county.warnings.length} 項警特報`],
-          detail: "最近快取仍列有效警示；現況請以官方頁為準。",
-          tone: "advisory",
-        }
-      : {
-          eyebrow: "時效內快取，不是即時確認",
-          lead: county.countyName,
-          focal: ["現況仍需確認"],
-          detail: "快取沒有列出警報，不足以證明現在沒有警報。",
-          tone: "advisory",
-        };
+  if (viewState === "expired") {
+    // Past 24 hours the last snapshot is still shown below, but the page draws no conclusion.
+    return {
+      eyebrow: "最後一筆資料超過 24 小時",
+      lead: countyName ? undefined : "目前",
+      focal: ["無法確認"],
+      tail: countyName ? `${countyName} 現況` : "全台警特報",
+      detail: "下方是 24 小時前的資料，只供參考；現況請到 CWA 官方頁確認。",
+      tone: "unknown",
+    };
   }
 
   if (!county) {
@@ -133,7 +158,7 @@ export function countyWarningPresentation(
     eyebrow: "CWA 警特報資料已取得",
     lead: county.countyName,
     focal: ["未列有效", "縣市警特報"],
-    detail: "截至本站取得時間，CWA 未列該縣市的有效警特報；這不代表所有災害都安全。",
+    detail: "截至資料時間，CWA 未列該縣市的有效警特報；這不代表所有災害都安全。",
     tone: "calm",
   };
 }
@@ -218,4 +243,22 @@ export function formatAge(minutes: number): string {
   if (minutes < 60) return `${minutes} 分鐘前`;
   if (minutes < 60 * 24) return `${Math.floor(minutes / 60)} 小時前`;
   return `${Math.floor(minutes / (60 * 24))} 天前`;
+}
+
+const TAIPEI_DATE = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Taipei", year: "numeric", month: "2-digit", day: "2-digit" });
+
+/** "14:05" for today in Taipei, "10/21 14:05" otherwise. */
+export function formatClock(value: string, now: number): string {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return value;
+  const time = new Intl.DateTimeFormat("zh-TW", { timeZone: "Asia/Taipei", hour: "2-digit", minute: "2-digit", hour12: false }).format(date);
+  if (TAIPEI_DATE.format(date) === TAIPEI_DATE.format(new Date(now))) return time;
+  const day = new Intl.DateTimeFormat("zh-TW", { timeZone: "Asia/Taipei", month: "2-digit", day: "2-digit" }).format(date);
+  return `${day} ${time}`;
+}
+
+/** The standard data-time label: 「資料時間 HH:MM · N 小時前」. */
+export function dataTimeLabel(value: string, now: number): string {
+  const age = minutesSince(value, now) ?? 0;
+  return `資料時間 ${formatClock(value, now)} · ${formatAge(age)}`;
 }

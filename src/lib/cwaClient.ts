@@ -81,7 +81,10 @@ interface CacheMergeResult {
   sources: SourceStatus[];
 }
 
-const CACHE_MAX_AGE_MS = 90 * 60 * 1000;
+// The static snapshot is refreshed by a best-effort GitHub schedule (3–4 hour
+// gaps in practice). Any snapshot up to a week old is loaded so the page can show
+// the last data with its age; the UI decides how much to conclude from it.
+const CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 const INVALID_WARNING_PAYLOAD_ERROR = "Invalid warning payload schema";
 
 const SOURCE_STALE_HOURS: Record<Exclude<CwaSourceKey, "warnings">, number> = {

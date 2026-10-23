@@ -145,6 +145,18 @@ function makeCachedEmptyWarningResult(): RiskDashboardLoadResult {
   };
 }
 
+function taipeiRain(endTime: string): WeatherWarning {
+  return {
+    countyName: "臺北市",
+    geocode: "63",
+    phenomena: "大雨",
+    significance: "特報",
+    startTime: "2026-05-30T00:00:00+08:00",
+    endTime,
+    affectedAreas: ["山區"],
+  };
+}
+
 function arrangeResult(result: RiskDashboardLoadResult, cached: RiskDashboardLoadResult | null = null) {
   mockedLoadCachedRiskDashboardData.mockResolvedValue(cached);
   mockedLoadRiskDashboardData.mockResolvedValue(result);
@@ -164,7 +176,7 @@ describe("App trust-first warning contract", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Fixtures were fetched at 00:30 Taipei time; pin "now" a few minutes later
-    // so the UI's 90-minute trust window treats them as fresh.
+    // so the UI's data-age bands treat them as fresh (under 90 minutes).
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-05-30T00:35:00+08:00"));
     window.history.replaceState(null, "", "/");
@@ -175,15 +187,54 @@ describe("App trust-first warning contract", () => {
     vi.useRealTimers();
   });
 
-  it("fails closed when the last live confirmation is older than the trust window", async () => {
-    vi.setSystemTime(new Date("2026-05-30T02:05:00+08:00"));
+  it("keeps the answer for data a few hours old and labels its age in amber", async () => {
+    vi.setSystemTime(new Date("2026-05-30T03:30:00+08:00"));
+    window.history.replaceState(null, "", "/?county=臺北市");
+    arrangeResult(makeCurrentResult([taipeiRain("2026-05-30T06:00:00+08:00")]));
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "臺北市 有 1 項警特報" })).toBeInTheDocument();
+    expect(screen.getByText("資料時間 00:30 · 3 小時前")).toBeInTheDocument();
+    expect(screen.getByText("這些警特報仍在 CWA 標示的有效期間內。")).toBeInTheDocument();
+    expect(screen.queryByText(/本站每 3–4 小時更新一次/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/警特報狀態待確認/)).not.toBeInTheDocument();
+  });
+
+  it("drops a warning whose own validity ended after the snapshot was taken", async () => {
+    vi.setSystemTime(new Date("2026-05-30T03:30:00+08:00"));
+    window.history.replaceState(null, "", "/?county=臺北市");
+    arrangeResult(makeCurrentResult([taipeiRain("2026-05-30T02:00:00+08:00")]));
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "臺北市 未列有效縣市警特報" })).toBeInTheDocument();
+    expect(screen.getByText("另有 1 項已在資料時間之後到期，未列入。")).toBeInTheDocument();
+  });
+
+  it("points to the official source once data is more than six hours old, still showing the answer", async () => {
+    vi.setSystemTime(new Date("2026-05-30T08:40:00+08:00"));
+    window.history.replaceState(null, "", "/?county=臺北市");
+    arrangeResult(makeCurrentResult());
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "臺北市 未列有效縣市警特報" })).toBeInTheDocument();
+    expect(screen.getByText("資料時間 00:30 · 8 小時前")).toBeInTheDocument();
+    expect(screen.getByText(/本站每 3–4 小時更新一次/)).toBeInTheDocument();
+  });
+
+  it("draws no conclusion from data more than 24 hours old but keeps it on screen", async () => {
+    vi.setSystemTime(new Date("2026-05-31T01:00:00+08:00"));
     window.history.replaceState(null, "", "/?county=臺北市");
     arrangeResult(makeCurrentResult());
 
     render(<App />);
 
     expect(await screen.findByRole("heading", { name: "無法確認 臺北市 現況" })).toBeInTheDocument();
-    expect(screen.getByText(/警特報狀態待確認/)).toBeInTheDocument();
+    expect(screen.getByText("這是 24 小時前的資料。")).toBeInTheDocument();
+    expect(screen.getByText("資料時間 05/30 00:30 · 1 天前")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "最後一筆資料中的警特報" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "臺北市 未列有效縣市警特報" })).not.toBeInTheDocument();
   });
 
@@ -246,7 +297,8 @@ describe("App trust-first warning contract", () => {
       await cache.promise;
     });
     expect(screen.getByRole("heading", { name: "臺北市 未列有效縣市警特報" })).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "臺北市 現況仍需確認" })).not.toBeInTheDocument();
+    expect(screen.getByText("資料時間 00:30 · 5 分鐘前")).toBeInTheDocument();
+    expect(screen.queryByText(/資料時間 00:20/)).not.toBeInTheDocument();
   });
 
   it("does not briefly accept a cache result when cache and live settle in the same turn", async () => {
@@ -257,8 +309,8 @@ describe("App trust-first warning contract", () => {
     render(<App />);
 
     expect(await screen.findByRole("heading", { name: "臺北市 未列有效縣市警特報" })).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "臺北市 現況仍需確認" })).not.toBeInTheDocument();
-    expect(screen.queryByText(/目前顯示時效內快取/)).not.toBeInTheDocument();
+    expect(screen.getByText("資料時間 00:30 · 5 分鐘前")).toBeInTheDocument();
+    expect(screen.queryByText(/資料時間 00:20/)).not.toBeInTheDocument();
   });
 
   it("shows a valid cache only while live data is unresolved, then replaces it with live truth", async () => {
@@ -269,13 +321,13 @@ describe("App trust-first warning contract", () => {
 
     render(<App />);
 
-    expect(await screen.findByRole("heading", { name: "臺北市 現況仍需確認" })).toBeInTheDocument();
+    expect(await screen.findByText("資料時間 00:20 · 15 分鐘前")).toBeInTheDocument();
     await act(async () => {
       live.resolve(makeCurrentResult());
       await live.promise;
     });
     expect(await screen.findByRole("heading", { name: "臺北市 未列有效縣市警特報" })).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "臺北市 現況仍需確認" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/資料時間 00:20/)).not.toBeInTheDocument();
   });
 
   it("replaces an interim cache with the fail-closed fatal state when live cannot confirm warnings", async () => {
@@ -291,14 +343,14 @@ describe("App trust-first warning contract", () => {
 
     render(<App />);
 
-    expect(await screen.findByRole("heading", { name: "臺北市 現況仍需確認" })).toBeInTheDocument();
+    expect(await screen.findByText("資料時間 00:20 · 15 分鐘前")).toBeInTheDocument();
     await act(async () => {
       live.resolve(fatalResult);
       await live.promise;
     });
     expect(await screen.findByRole("heading", { name: "目前無法確認官方警特報" })).toBeInTheDocument();
     expect(screen.getByText(/無法取得 CWA 即時資料，也沒有在時效內的可用快取/)).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "臺北市 現況仍需確認" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/資料時間 00:20/)).not.toBeInTheDocument();
     expect(screen.queryByText("整體安全")).not.toBeInTheDocument();
   });
 
@@ -319,7 +371,7 @@ describe("App trust-first warning contract", () => {
 
     render(<App />);
 
-    expect(await screen.findByRole("heading", { name: "臺北市 現況仍需確認" })).toBeInTheDocument();
+    expect(await screen.findByText("資料時間 00:20 · 15 分鐘前")).toBeInTheDocument();
     fireEvent.click(screen.getAllByRole("button", { name: "更新資料" })[0]);
     expect(await screen.findByRole("heading", { name: "臺北市 有 1 項警特報" })).toBeInTheDocument();
 
@@ -345,18 +397,18 @@ describe("App trust-first warning contract", () => {
     expect(screen.queryByRole("heading", { name: "臺北市 未列有效縣市警特報" })).not.toBeInTheDocument();
   });
 
-  it("does not turn an empty cached warning payload into a no-warning claim", async () => {
+  it("shows a recent snapshot as data with its own time rather than as live confirmation", async () => {
     window.history.replaceState(null, "", "/?county=臺北市");
     const cachedResult = makeCachedEmptyWarningResult();
     arrangeResult(cachedResult, cachedResult);
 
     render(<App />);
 
-    expect(await screen.findByRole("heading", { name: "臺北市 現況仍需確認" })).toBeInTheDocument();
-    expect(screen.getByText(/目前顯示時效內快取/)).toBeInTheDocument();
-    expect(screen.getByText(/快取沒有列出警報，不足以證明現在沒有警報/)).toBeInTheDocument();
-    expect(screen.getByText(/快取空白不能證明目前沒有警報/)).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "臺北市 未列有效縣市警特報" })).not.toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "臺北市 未列有效縣市警特報" })).toBeInTheDocument();
+    // The age is measured from the snapshot (00:20), not from when the browser loaded it.
+    expect(screen.getByText("資料時間 00:20 · 15 分鐘前")).toBeInTheDocument();
+    expect(screen.getAllByText(/快取建立：.*00:20/).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/本站直接取得/)).not.toBeInTheDocument();
     expect(screen.queryByText(/官方來源讀取正常/)).not.toBeInTheDocument();
   });
 

@@ -26,11 +26,11 @@
 
 | 類別 | 需求 | 目前做法與驗證 |
 | --- | --- | --- |
-| 可信度 | 來源失敗、快取空白、資料超過 90 分鐘時，不得顯示「安全／無警報」 | `warningViewStateAt` 依取得時間降級；App 與 presentation 測試涵蓋 |
-| 時效 | 標示官方發布時間與本站取得時間；頁面開著也會老化 | 頁首相對時間，30 分鐘提示更新，90 分鐘 fail closed |
+| 可信度 | 來源失敗或資料超過 24 小時時，不得顯示「安全／無警報」 | `warningViewStateAt` 依資料時間分段；App 與 presentation 測試涵蓋邊界 |
+| 時效 | 答案旁標示資料時間；頁面開著也會老化；門檻對齊實際排程 | ≤ 90 分鐘即時、≤ 6 小時稍舊、≤ 24 小時過舊，超過 24 小時不下結論 |
 | 效能 | 手機 4G 下 LCP < 2.5 s、CLS < 0.1 | Lighthouse 行動版 performance 97、CLS 0.066（見 PR 說明）；不載入中文 webfont |
 | 可及性 | WCAG 2.1 AA：文字對比 4.5:1、圖形 3:1、觸控目標 ≥ 44 px、鍵盤可操作 | `tests/designTokens.test.ts` 自動檢查色彩 token；Lighthouse accessibility 100 |
-| 韌性 | 颱風期間流量尖峰、CWA 來源暫時失效 | GitHub Pages 靜態部署；90 分鐘內快取備援；失敗時引導到官方頁 |
+| 韌性 | 颱風期間流量尖峰、CWA 來源暫時失效 | GitHub Pages 靜態部署；7 天內的快照都可當備援，並標示資料時間；失敗時引導到官方頁 |
 | 隱私 | 不追蹤、不需要帳號、不在瀏覽器放 API key | 沒有分析腳本；只在 localStorage 存深淺色偏好 |
 | 可維護 | 改 UI 不影響資料正確性 | 資料層（`cwaClient`、`riskEngine`）與呈現層（`presentation`）分開，各有測試 |
 

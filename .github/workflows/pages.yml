@@ -5,8 +5,9 @@ on:
     branches: [main]
   workflow_dispatch:
   schedule:
-    # Best-effort refresh: GitHub may delay or skip scheduled workflow runs.
-    - cron: "17,47 * * * *"
+    # Best-effort refresh: GitHub may delay or skip scheduled workflow runs
+    # (3–4 hour gaps observed); more staggered minutes give it more chances.
+    - cron: "7,22,37,52 * * * *"
 
 permissions:
   contents: read

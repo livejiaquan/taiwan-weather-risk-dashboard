@@ -5,7 +5,9 @@ import { validateWarningPayload } from "../src/lib/warningPayloadValidator";
 
 const DEFAULT_DEPLOYMENT_URL =
   "https://livejiaquan.github.io/taiwan-weather-risk-dashboard/data/latest.json";
-const MAX_AGE_MS = 90 * 60 * 1000;
+// Alert only when the snapshot leaves the site's "aging" band (6 hours). The
+// GitHub schedule is best effort and routinely runs 3–4 hours apart.
+const MAX_AGE_MS = 6 * 60 * 60 * 1000;
 const MAX_WARNING_FUTURE_SKEW_MS = 5 * 60 * 1000;
 const REQUEST_TIMEOUT_MS = 10_000;
 const RETRY_DELAY_MS = 250;
@@ -33,7 +35,7 @@ export function checkDeploymentFreshness(
     throw new Error("deployment cache.generatedAt is in the future and cannot be used by the browser");
   }
   if (ageMs > MAX_AGE_MS) {
-    throw new Error("deployment cache is older than 90 minutes");
+    throw new Error("deployment cache is older than 6 hours");
   }
 
   const sources = Array.isArray(cache.sources) ? cache.sources : [];

@@ -210,12 +210,12 @@ describe("loadRiskDashboardData", () => {
     });
   });
 
-  it("rejects a stale direct cache using top-level generatedAt as the authority", async () => {
+  it("rejects a direct cache older than seven days using top-level generatedAt as the authority", async () => {
     const result = await loadCachedRiskDashboardData({
       fetcher: async () =>
         new Response(
           JSON.stringify({
-            generatedAt: "2026-05-29T22:00:00+08:00",
+            generatedAt: "2026-05-22T22:00:00+08:00",
             payloads: {
               generatedAt: "2026-05-30T00:20:00+08:00",
               warningPayload: completeWarningPayload("2026-05-30T00:15:00+08:00"),
@@ -230,6 +230,29 @@ describe("loadRiskDashboardData", () => {
     });
 
     expect(result).toBeNull();
+  });
+
+  it("accepts a snapshot hours old so the page can show it with its age", async () => {
+    const result = await loadCachedRiskDashboardData({
+      fetcher: async () =>
+        new Response(
+          JSON.stringify({
+            generatedAt: "2026-05-29T16:30:00+08:00",
+            payloads: {
+              generatedAt: "2026-05-29T16:30:00+08:00",
+              warningPayload: completeWarningPayload("2026-05-29T16:00:00+08:00"),
+              rainfallPayload: null,
+              weatherPayload: null,
+              earthquakePayload: null,
+              typhoonPayload: null,
+            },
+          }),
+        ),
+      now: () => new Date("2026-05-30T00:30:00+08:00"),
+    });
+
+    expect(result?.warnings.coverage).toBe("cached");
+    expect(result?.warnings.cacheGeneratedAt).toBe("2026-05-29T16:30:00+08:00");
   });
 
   it("labels a cached feed with no effective warnings as cached rather than a current no-warning confirmation", async () => {
@@ -1053,7 +1076,7 @@ describe("loadRiskDashboardData", () => {
     expect(result.warnings.coverage).toBe("unavailable");
   });
 
-  it("does not merge a stale cache into a partial live result", async () => {
+  it("does not merge a cache older than seven days into a partial live result", async () => {
     const cachedWarningPayload = completeWarningPayload("2026-05-30T00:00:00+08:00", {
       花蓮縣: heavyRainHazard("2026-05-29T22:41:00+08:00", "2026-05-30T05:00:00+08:00"),
     });
@@ -1063,7 +1086,7 @@ describe("loadRiskDashboardData", () => {
         if (url === "data/latest.json") {
           return new Response(
             JSON.stringify({
-              generatedAt: "2026-05-29T22:59:59+08:00",
+              generatedAt: "2026-05-23T00:29:59+08:00",
               payloads: {
                 generatedAt: "2026-05-30T00:20:00+08:00",
                 warningPayload: cachedWarningPayload,
